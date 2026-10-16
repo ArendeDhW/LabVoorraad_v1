@@ -171,7 +171,7 @@ textarea.inv{min-height:70px;resize:vertical}
 .blad-kop h2{flex:1;font-size:1.08rem}
 .blad-kop button{border:0;background:var(--kaart);width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.2rem}
 .blad-lyf{overflow-y:auto;padding:14px 16px 20px}
-@keyframes in{from{opacity:0}}
+@keyframes in{from{background:rgba(10,18,17,0)}}
 @keyframes op{from{transform:translateY(40px)}}
 .toast{animation:toastIn .2s}@keyframes toastIn{from{transform:translateY(10px);opacity:0}}
 
@@ -258,7 +258,7 @@ const K = { api: 'dva_api', token: 'dva_token', kas: 'dva_kas', werk: 'dva_werk'
 let API = stoor.kry(K.api, '') || STANDAARD_API;
 const S = {
   token: stoor.kry(K.token, ''),
-  gebruiker: null, liggings: [], items: [], voorraad: [], uitlenings: [], gebreek: [], log: [], gebruikers: [], versoeke: [],
+  gebruiker: null, liggings: [], items: [], voorraad: [], uitlenings: [], gebreek: [], log: [], gebruikers: [], versoeke: [], kontakte: [],
   instellings: { skool: '', eposAan: true },
   blad: 'skandeer', gelaai: null, sincFout: false
 };
@@ -291,7 +291,7 @@ function werkLigging() {
 function bewaarKas() {
   stoor.stel(K.kas, {
     gebruiker: S.gebruiker, liggings: S.liggings, items: S.items, voorraad: S.voorraad, uitlenings: S.uitlenings,
-    gebreek: S.gebreek, log: S.log.slice(-400), gebruikers: S.gebruikers, versoeke: S.versoeke, instellings: S.instellings, gelaai: S.gelaai
+    gebreek: S.gebreek, log: S.log.slice(-400), gebruikers: S.gebruikers, versoeke: S.versoeke, kontakte: S.kontakte, instellings: S.instellings, gelaai: S.gelaai
   });
 }
 
@@ -355,6 +355,11 @@ function pasToe(res) {
   if (res.uitleen) upsert(S.uitlenings, res.uitleen, x => x.id === res.uitleen.id);
   if (res.gebreek) upsert(S.gebreek, res.gebreek, x => x.id === res.gebreek.id);
   if (res.versoek) upsert(S.versoeke, res.versoek, x => x.id === res.versoek.id);
+  if (res.gebruiker) {
+    const g = res.gebruiker;
+    if (g.aktief) upsert(S.kontakte, { id: g.id, naam: g.naam, epos: g.epos, selfoon: g.selfoon || '', liggings: g.liggings, rol: g.rol }, x => x.id === g.id);
+    else S.kontakte = S.kontakte.filter(x => x.id !== g.id);
+  }
   if (res.ligging) upsert(S.liggings, res.ligging, x => x.id === res.ligging.id);
   if (res.gebruiker) {
     if (isAdmin()) upsert(S.gebruikers, res.gebruiker, x => x.id === res.gebruiker.id);
@@ -372,7 +377,7 @@ async function laaiAlles(stil) {
     const d = await api('laai');
     Object.assign(S, {
       gebruiker: d.gebruiker, liggings: d.liggings, items: d.items, voorraad: d.voorraad, uitlenings: d.uitlenings,
-      gebreek: d.gebreek, log: d.log, gebruikers: d.gebruikers || [], versoeke: d.versoeke || [], instellings: d.instellings, gelaai: new Date().toISOString()
+      gebreek: d.gebreek, log: d.log, gebruikers: d.gebruikers || [], versoeke: d.versoeke || [], kontakte: d.kontakte || [], instellings: d.instellings, gelaai: new Date().toISOString()
     });
     herIndekseer();
     bewaarKas();
@@ -618,6 +623,12 @@ function teken() {
   ({ skandeer: tekenSkandeer, voorraad: tekenVoorraad, uitleen: tekenUitleen, etikette: tekenEtikette, meer: tekenMeer })[S.blad]();
 }
 
+function persoonKeuse(naam, gekies) {
+  const lys = S.kontakte.slice().sort((a, b) => a.naam.localeCompare(b.naam));
+  return `<select class="inv" name="${naam}" required><option value="">Kies 'n gebruiker…</option>${lys.map(k => `<option value="${esc(k.id)}" ${k.id === gekies ? 'selected' : ''}>${esc(k.naam)} · ${esc(k.rol === 'admin' && !k.liggings.length ? 'Admin' : k.liggings.map(ligNaam).join(', ') || 'geen lab')}</option>`).join('')}</select>`;
+}
+const kontak = id => S.kontakte.find(k => k.id === id);
+
 function ligKeuse(naam, gekies, lys = myLiggings(), leeg) {
   return `<select class="inv" name="${naam}">${leeg ? `<option value="">${esc(leeg)}</option>` : ''}${lys.map(l => `<option value="${esc(l.id)}" ${l.id === gekies ? 'selected' : ''}>${esc(l.naam)}${l.tipe ? ' · ' + esc(l.tipe) : ''}</option>`).join('')}</select>`;
 }
@@ -832,32 +843,35 @@ document.addEventListener('visibilitychange', () => {
 /* ---------------------------------------------------------------------
    Item-kaart en aksies
 --------------------------------------------------------------------- */
-function itemKaart(item, metKnoppies) {
+function itemKaart(item, metKnoppies, inDetail) {
   const rye = voorraadRye(item.barcode).sort((a, b) => ligNaam(a.liggingId).localeCompare(ligNaam(b.liggingId)));
   const tot = totaalVan(item.barcode);
   const lenings = oopLenings(item.barcode);
   const laag = isAdmin() && item.minVoorraad > 0 && tot < item.minVoorraad;
   const elders = item.aktief ? eldersBeskikbaar(item.barcode) : [];
   return `<div class="kaart">
-    <div class="item-kop"><div class="ikoon">${IK.fles}</div>
+    <div class="item-kop" ${inDetail ? '' : 'data-detail role="button" style="cursor:pointer"'}><div class="ikoon">${IK.fles}</div>
       <div style="flex:1;min-width:0"><h2>${esc(item.naam)}</h2>
-        <div class="sag klein"><span class="mono">${esc(item.barcode)}</span>${item.kategorie ? ' · ' + esc(item.kategorie) : ''}</div></div>
+        <div class="sag klein"><span class="mono">${esc(item.barcode)}</span>${item.kategorie ? ' · ' + esc(item.kategorie) : ''}</div>
+        ${inDetail ? '' : '<div class="klein" style="color:var(--hoof);font-weight:600;margin-top:2px">Besonderhede en geskiedenis ›</div>'}</div>
       <div style="text-align:right"><div class="totaal">${fmtN(tot)}</div><div class="sag klein">${esc(item.eenheid || 'stuks')}${isAdmin() ? '' : ' in jou liggings'}</div></div></div>
     ${laag ? `<p style="margin:10px 0 0"><span class="etiket amber">Lae voorraad · minimum ${fmtN(item.minVoorraad)}</span></p>` : ''}
     <ul class="voorraadlys">${rye.length ? rye.map(v => `<li><span>${esc(ligNaam(v.liggingId))}</span><b>${fmtN(v.hoeveelheid)}</b></li>`).join('') : '<li class="sag">Nog geen voorraad in jou liggings nie.</li>'}
     ${lenings.map(l => `<li><span><span class="etiket ${isLaat(l) ? 'rooi' : 'amber'}">${isLaat(l) ? 'Laat' : 'Uitgeleen'}</span> ${esc(ligNaam(l.vanLigging))} → ${esc(ligNaam(l.naLigging))}<br><span class="sag klein">${esc(l.persoon)} · terug ${fmtD(l.terugDatum)}</span></span><b>${fmtN(uitstaande(l))}</b></li>`).join('')}</ul>
     ${elders.length ? `<div class="sag klein" style="margin:14px 2px 0;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Elders beskikbaar</div>
       <ul class="voorraadlys" style="border-top:0;margin-top:4px">${elders.map(v => `<li><span>${esc(ligNaam(v.liggingId))} <b>${fmtN(v.hoeveelheid)}</b></span><button class="kn klein" data-vs="${esc(v.liggingId)}">Versoek</button></li>`).join('')}</ul>` : ''}
-    ${metKnoppies ? `<div class="knrooster" style="margin-top:12px">
+    ${metKnoppies ? (isAdmin() || inMyLab(item.barcode) ? `<div class="knrooster" style="margin-top:12px">
       <button class="kn" data-a="in">＋ In</button><button class="kn" data-a="uit">－ Uit</button>
       <button class="kn" data-a="leen">${IK.leen}<span>Leen uit</span></button><button class="kn" data-a="gebreek">${IK.gebreek}<span>Gebreek</span></button>
-      <button class="kn" data-a="tel">Tel / stel</button><button class="kn" data-a="meer">Meer…</button></div>` : ''}
+      <button class="kn" data-a="tel">Tel / stel</button><button class="kn" data-a="versoek">${IK.leen}<span>Versoek</span></button></div>`
+      : `<div class="knrooster" style="margin-top:12px"><button class="kn" data-a="in">＋ In (na my lab)</button><button class="kn hoof" data-a="versoek">${IK.leen}<span>Versoek</span></button></div>`) : ''}
   </div>`;
 }
 function koppelItemKaart(houer, item) {
   $$('[data-vs]', houer).forEach(b => b.onclick = () => versoekVorm(item.barcode, b.dataset.vs));
+  const kop = $('[data-detail]', houer); if (kop) kop.onclick = () => wysItemDetail(item.barcode);
   $$('[data-a]', houer).forEach(b => b.onclick = () => {
-    if (b.dataset.a === 'meer') return wysItemDetail(item.barcode);
+    if (b.dataset.a === 'versoek') return kiesBron(item);
     openAksie(b.dataset.a, item.barcode, werkLigging());
   });
 }
@@ -882,10 +896,9 @@ function openAksie(modus, barcode, lig) {
   if (modus === 'tel') lyf += `<label class="veld"><span>Werklike telling</span>${stapper(huidig)}</label>`;
   else lyf += `<label class="veld"><span>Hoeveelheid</span>${stapper(1)}</label>`;
   if (modus === 'leen') {
-    lyf += `<label class="veld"><span>Leen uit na</span>${ligKeuse('na', '', ander, 'Kies lab / klas…')}</label>
-      <label class="veld"><span>Wie teken uit?</span><input class="inv" name="persoon" required placeholder="Naam en van" autocomplete="off"></label>
-      <div class="twee"><label class="veld"><span>E-pos (vir kwitansie)</span><input class="inv" name="epos" type="email" placeholder="opsioneel"></label>
-      <label class="veld"><span>Selfoon</span><input class="inv" name="selfoon" type="tel" placeholder="opsioneel"></label></div>
+    lyf += `<label class="veld"><span>Wie teken uit?</span>${persoonKeuse('persoonId', '')}</label>
+      <div class="kaart plat klein verberg" id="wieInfo" style="margin:0"></div>
+      <label class="veld"><span>Leen uit na</span>${ligKeuse('na', '', ander, 'Kies lab / klas…')}</label>
       <label class="veld"><span>Terug teen</span><input class="inv" name="terugDatum" type="date" value="${isoDag(terug)}" min="${isoDag(new Date())}"></label>`;
   }
   if (modus === 'gebreek') lyf += `<label class="veld"><span>Wat het gebeur?</span><textarea class="inv" name="rede" placeholder="bv. Geval tydens prakties, gekraak"></textarea></label>`;
@@ -901,11 +914,25 @@ function openAksie(modus, barcode, lig) {
       if (modus === 'tel') hv.value = voorraadVan(barcode, f.lig.value);
       if (f.na) { const nu = f.na.value; f.na.outerHTML = ligKeuse('na', nu, aktieweLiggings().filter(l => l.id !== f.lig.value), 'Kies lab / klas…'); }
     };
+    if (f.persoonId) f.persoonId.onchange = () => {
+      const k = kontak(f.persoonId.value);
+      const info = $('#wieInfo', blad.lyf);
+      info.classList.toggle('verberg', !k);
+      if (!k) return;
+      info.innerHTML = `<div class="ry tussen"><span class="sag">E-pos</span><b>${esc(k.epos)}</b></div>
+        <div class="ry tussen" style="margin-top:4px"><span class="sag">Selfoon</span><b>${esc(k.selfoon || '—')}</b></div>
+        <div class="ry tussen" style="margin-top:4px"><span class="sag">Lab(s)</span><b>${esc(k.liggings.map(ligNaam).join(', ') || '—')}</b></div>
+        <div class="sag" style="margin-top:6px">'n Kwitansie word na ${esc(k.epos)} gestuur.</div>`;
+      // Vul die bestemming outomaties in met die persoon se eie lab
+      const sy = k.liggings.find(id => id !== f.lig.value && IX.lig.get(id)?.aktief);
+      if (sy) f.na.value = sy;
+    };
     f.onsubmit = async e => {
       e.preventDefault();
       const d = Object.fromEntries(new FormData(f));
       const n = getal(d.hoeveelheid);
       if (isNaN(n) || n < 0 || (modus !== 'tel' && n <= 0)) return wysFout(f, new Error('Gee \'n geldige hoeveelheid.'));
+      if (modus === 'leen' && !d.persoonId) return wysFout(f, new Error('Kies wie uitteken.'));
       if (modus === 'leen' && !d.na) return wysFout(f, new Error('Kies waarheen dit uitgeleen word.'));
       if ((modus === 'uit' || modus === 'leen' || modus === 'gebreek') && n > voorraadVan(barcode, d.lig)) {
         return wysFout(f, new Error(`Daar is net ${fmtN(voorraadVan(barcode, d.lig))} by ${ligNaam(d.lig)}.`));
@@ -922,9 +949,9 @@ function openAksie(modus, barcode, lig) {
             plaaslikeLog('TEL', barcode, d.lig, n, '');
             toast(`${item.naam}: telling ${fmtN(n)} gestoor`, 'goed');
           } else if (modus === 'leen') {
-            const r = await skryf('leen_uit', { barcode, vanLigging: d.lig, naLigging: d.na, hoeveelheid: n, persoon: d.persoon, epos: d.epos, selfoon: d.selfoon, terugDatum: d.terugDatum, nota: d.nota });
-            plaaslikeLog('LEEN', barcode, d.lig, n, `${d.persoon} → ${ligNaam(d.na)}`);
-            toast(`${fmtN(n)} ${item.naam} uitgeleen aan ${d.persoon}${r.uitleen.epos ? ' (kwitansie gestuur)' : ''}`, 'goed');
+            const r = await skryf('leen_uit', { barcode, vanLigging: d.lig, naLigging: d.na, hoeveelheid: n, persoonId: d.persoonId, terugDatum: d.terugDatum, nota: d.nota });
+            plaaslikeLog('LEEN', barcode, d.lig, n, `${r.uitleen.persoon} → ${ligNaam(d.na)}`);
+            toast(`${fmtN(n)} ${item.naam} uitgeleen aan ${r.uitleen.persoon}${r.uitleen.epos ? ' (kwitansie gestuur)' : ''}`, 'goed');
           } else if (modus === 'gebreek') {
             await skryf('gebreek_meld', { barcode, liggingId: d.lig, hoeveelheid: n, rede: d.rede });
             plaaslikeLog('GEBREEK', barcode, d.lig, n, d.rede);
@@ -947,6 +974,9 @@ function herteken() {
   blaaie.forEach(b => b.herlaai && b.herlaai());
 }
 
+const inMyLab = bc => S.voorraad.some(v => v.barcode === bc && magLig(v.liggingId));
+const magWysig = item => isAdmin() || inMyLab(item.barcode);
+
 function wysItemDetail(barcode) {
   const b = maakBlad('Item', '', blad => {
     blad.herlaai = () => {
@@ -954,8 +984,8 @@ function wysItemDetail(barcode) {
       if (!item) return blad.sluit();
       const gesk = S.log.filter(l => l.barcode === barcode).slice(-25).reverse();
       const breek = S.gebreek.filter(g => g.barcode === barcode).slice(-10).reverse();
-      blad.lyf.innerHTML = itemKaart(item, item.aktief) + `
-        <div class="twee" style="margin-bottom:12px"><button class="kn" id="wys">${IK.pen}<span>Wysig</span></button>
+      blad.lyf.innerHTML = itemKaart(item, item.aktief, true) + `
+        <div class="twee" style="margin-bottom:12px">${magWysig(item) ? `<button class="kn" id="wys">${IK.pen}<span>Wysig</span></button>` : ''}
         <button class="kn" id="etk">${IK.etiket}<span>Druk etiket</span></button></div>
         ${item.beskrywing ? `<div class="kaart plat"><div class="sag klein">Beskrywing</div>${esc(item.beskrywing)}</div>` : ''}
         ${breek.length ? `<div class="afdeling">Gebreek</div><div class="lys">${breek.map(g => `<div class="el"><div class="hoof-teks"><b>${esc(ligNaam(g.liggingId))} · ${fmtD(g.datum)}</b><span class="sag klein">${esc(g.rede || '—')} · ${esc(g.deur)}</span></div><span class="etiket ${g.status === 'aangemeld' ? 'rooi' : g.status === 'herstel' ? 'groen' : 'grys'}">${esc(g.status)}</span><div class="getal">${fmtN(g.hoeveelheid)}</div></div>`).join('')}</div>` : ''}
@@ -964,7 +994,7 @@ function wysItemDetail(barcode) {
         ${isAdmin() && item.aktief ? '<button class="kn gevaar vol" id="verw" style="margin-top:16px">Verwyder item</button>' : ''}
         ${isAdmin() && !item.aktief ? '<button class="kn hoof vol" id="herst" style="margin-top:16px">Herstel item</button>' : ''}`;
       koppelItemKaart(blad.lyf, item);
-      $('#wys', blad.lyf).onclick = () => wysItemVorm(item);
+      if ($('#wys', blad.lyf)) $('#wys', blad.lyf).onclick = () => wysItemVorm(item);
       $('#etk', blad.lyf).onclick = () => { voegEtiketBy(item.barcode, 1); blad.sluit(); S.blad = 'etikette'; teken(); };
       if ($('#verw', blad.lyf)) $('#verw', blad.lyf).onclick = async () => {
         if (!await bevestig(`Verwyder "${item.naam}"? Dit sal nie meer gewys of geskandeer kan word nie. (Die geskiedenis bly in die Sheet.)`, 'Verwyder', true)) return;
@@ -1131,7 +1161,7 @@ function eldersBeskikbaar(bc) {
 }
 function kiesBron(item) {
   const bronne = S.voorraad.filter(v => v.barcode === item.barcode && v.hoeveelheid > 0 && IX.lig.get(v.liggingId)?.aktief && (!isAdmin() ? !magLig(v.liggingId) : true));
-  if (!bronne.length) return toast(`${item.naam} is nie elders beskikbaar nie.`, 'fout');
+  if (!bronne.length) return toast(`${item.naam} is nie in 'n ander lab beskikbaar om te versoek nie.`, 'fout');
   if (bronne.length === 1) return versoekVorm(item.barcode, bronne[0].liggingId);
   maakBlad('Uit watter lab?', `<div class="lys">${bronne.map(v => `<button class="el" data-l="${esc(v.liggingId)}"><div class="hoof-teks"><b>${esc(ligNaam(v.liggingId))}</b></div><div class="getal">${fmtN(v.hoeveelheid)}</div></button>`).join('')}</div>`, b => {
     $$('[data-l]', b.lyf).forEach(el => el.onclick = () => { b.sluit(); versoekVorm(item.barcode, el.dataset.l); });
@@ -1487,7 +1517,7 @@ function tekenEtikette() {
     <div class="kaart stapel">
       <div class="ry tussen"><h2 style="font-size:1.05rem">Strepieskode-etikette</h2><span class="etiket">${totaal} etiket${totaal === 1 ? '' : 'te'} · ${bladsye} blad${bladsye === 1 ? '' : 'e'}</span></div>
       ${eerste ? `<div class="voorskou">${e.skool && S.instellings.skool ? `<div class="s">${esc(S.instellings.skool)}</div>` : ''}${e.naam !== false ? `<div class="n">${esc(eerste.naam)}</div>` : ''}${strepieSvg(eerste.barcode)}<div class="k">${esc(eerste.barcode)}</div></div>` : '<p class="sag" style="margin:0">Kies watter items etikette moet kry.</p>'}
-      <div class="twee"><button class="kn" id="eVoeg">${IK.plus}<span>Voeg items by</span></button><button class="kn" id="eAlles">Alle items</button></div>
+      <div class="twee"><button class="kn" id="eVoeg">${IK.plus}<span>Voeg items by</span></button><button class="kn" id="eAlles">${isAdmin() ? 'Alle items' : 'Alle my items'}</button></div>
     </div>
     ${e.lys.length ? `<div class="lys" style="margin-bottom:12px">${e.lys.map((x, i) => { const it = IX.item.get(x.bc); return `<div class="el" style="cursor:default"><div class="hoof-teks"><b>${esc(it.naam)}</b><span class="sag klein mono">${esc(it.barcode)}</span></div>
       <div class="tel-ry"><button class="kn klein" data-min="${i}">−</button><input class="inv" data-n="${i}" type="number" min="0" value="${x.n}" style="min-height:36px;padding:4px"><button class="kn klein" data-plus="${i}">+</button></div></div>`; }).join('')}</div>
@@ -1505,7 +1535,7 @@ function tekenEtikette() {
     </div>`;
   const her = () => tekenEtikette();
   $('#eVoeg').onclick = () => kiesItem({ titel: 'Voeg etikette by', veelvoudig: true, by: it => { voegEtiketBy(it.barcode, 1); toast(`${it.naam} bygevoeg`); } }).toe = her;
-  $('#eAlles').onclick = () => { const x = etiketInstellings(); S.items.filter(i => i.aktief).forEach(i => { if (!x.lys.find(y => y.bc === i.barcode)) x.lys.push({ bc: i.barcode, n: 1 }); }); stelEtiket(x); her(); };
+  $('#eAlles').onclick = () => { const x = etiketInstellings(); S.items.filter(i => i.aktief && (isAdmin() || inMyLab(i.barcode))).forEach(i => { if (!x.lys.find(y => y.bc === i.barcode)) x.lys.push({ bc: i.barcode, n: 1 }); }); stelEtiket(x); her(); };
   if ($('#eLeeg')) $('#eLeeg').onclick = () => { const x = etiketInstellings(); x.lys = []; stelEtiket(x); her(); };
   $$('[data-min]').forEach(b => b.onclick = () => { const x = etiketInstellings(); const i = +b.dataset.min; x.lys[i].n--; if (x.lys[i].n <= 0) x.lys.splice(i, 1); stelEtiket(x); her(); });
   $$('[data-plus]').forEach(b => b.onclick = () => { const x = etiketInstellings(); x.lys[+b.dataset.plus].n++; stelEtiket(x); her(); });
@@ -2165,8 +2195,9 @@ function gebruikerVorm(g) {
   maakBlad(g ? 'Wysig gebruiker' : 'Nuwe gebruiker', `<form class="stapel" id="gf">
     <label class="veld"><span>Naam</span><input class="inv" name="naam" required value="${esc(g?.naam || '')}"></label>
     <label class="veld"><span>E-pos (gebruikersnaam)</span><input class="inv" name="epos" type="email" required value="${esc(g?.epos || '')}"></label>
+    <label class="veld"><span>Selfoon</span><input class="inv" name="selfoon" type="tel" value="${esc(g?.selfoon || '')}" placeholder="opsioneel"></label>
     <label class="veld"><span>Rol</span><select class="inv" name="rol" ${ek ? 'disabled' : ''}><option value="onderwyser">Onderwyser — net eie klas/lab</option><option value="admin" ${g?.rol === 'admin' ? 'selected' : ''}>Admin — toegang tot alles</option></select></label>
-    <div id="ligKeus"><div class="sag klein" style="font-weight:600;margin:0 0 6px 2px">Klasse / labs wat hy of sy hanteer</div>
+    <div id="ligKeus"><div class="sag klein" style="font-weight:600;margin:0 0 6px 2px">Labs / klasse waartoe hy of sy toegang het</div>
       <div class="merk">${aktieweLiggings().map(l => `<label><input type="checkbox" name="lig" value="${esc(l.id)}" ${g?.liggings.includes(l.id) ? 'checked' : ''}>${esc(l.naam)}</label>`).join('') || '<span class="sag">Voeg eers liggings by.</span>'}</div></div>
     ${g && !ek ? `<label class="skakel"><input type="checkbox" name="aktief" ${g.aktief ? 'checked' : ''}><span>Rekening is aktief</span></label>` : ''}
     <button class="kn hoof vol">${g ? 'Stoor' : 'Skep rekening'}</button>
@@ -2176,7 +2207,7 @@ function gebruikerVorm(g) {
     f.rol.onchange = wys; wys();
     f.onsubmit = async e => {
       e.preventDefault();
-      const data = { id: g?.id, naam: f.naam.value, epos: f.epos.value, rol: ek ? 'admin' : f.rol.value, liggings: $$('input[name=lig]:checked', f).map(i => i.value), aktief: f.aktief ? f.aktief.checked : true };
+      const data = { id: g?.id, naam: f.naam.value, epos: f.epos.value, selfoon: f.selfoon.value, rol: ek ? 'admin' : f.rol.value, liggings: $$('input[name=lig]:checked', f).map(i => i.value), aktief: f.aktief ? f.aktief.checked : true };
       await metKnop($('button.hoof', f), async () => {
         try {
           const r = await skryf('gebruiker_stoor', data);
@@ -2229,7 +2260,7 @@ function wysInstellings() {
   }
   const kas = stoor.kry(K.kas, null);
   if (kas && kas.gebruiker) {
-    Object.assign(S, kas, { gebruikers: kas.gebruikers || [], versoeke: kas.versoeke || [] });
+    Object.assign(S, kas, { gebruikers: kas.gebruikers || [], versoeke: kas.versoeke || [], kontakte: kas.kontakte || [] });
     herIndekseer();
     if (!S.gebruiker.moetVerander) teken();
   } else {
