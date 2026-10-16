@@ -1,0 +1,1566 @@
+<!doctype html>
+<html lang="af">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f4c4a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Lab Voorraad</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f4c4a'/%3E%3Cpath d='M26 12h12v4h-2v12l12 20a4 4 0 0 1-3.5 6h-25A4 4 0 0 1 16 48l12-20V16h-2z' fill='%23f2a93b'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f3f1ec; --kaart:#ffffff; --kaart2:#f8f7f3; --teks:#14211f; --sag:#5d6b69; --lyn:#e2ded5;
+  --hoof:#0f4c4a; --hoof2:#16645f; --hoof-sag:#dcebe8; --amber:#f2a93b; --amber-sag:#fdf0d9;
+  --goed:#1d7a4f; --goed-sag:#dff2e7; --fout:#b3362c; --fout-sag:#fbe3df; --waarsku:#a8650a;
+  --skadu:0 1px 2px rgba(20,33,31,.06),0 4px 14px rgba(20,33,31,.06);
+  --r:14px; --nav:64px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1514; --kaart:#17201f; --kaart2:#1c2726; --teks:#e8eeec; --sag:#9aaba8; --lyn:#2a3735;
+  --hoof:#5fb8ad; --hoof2:#7cc9bf; --hoof-sag:#1d3533; --amber:#f2b252; --amber-sag:#3a2d16;
+  --goed:#5cc48d; --goed-sag:#173325; --fout:#ef7d71; --fout-sag:#3b1d1a; --waarsku:#f2b252;
+  --skadu:0 1px 2px rgba(0,0,0,.3);
+}}
+:root[data-theme="dark"]{
+  --bg:#0e1514; --kaart:#17201f; --kaart2:#1c2726; --teks:#e8eeec; --sag:#9aaba8; --lyn:#2a3735;
+  --hoof:#5fb8ad; --hoof2:#7cc9bf; --hoof-sag:#1d3533; --amber:#f2b252; --amber-sag:#3a2d16;
+  --goed:#5cc48d; --goed-sag:#173325; --fout:#ef7d71; --fout-sag:#3b1d1a; --waarsku:#f2b252;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--teks);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{min-height:100vh;padding-bottom:calc(var(--nav) + env(safe-area-inset-bottom))}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;line-height:1.2}
+.verberg{display:none!important}
+.sag{color:var(--sag)} .klein{font-size:.85rem}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.02em}
+
+/* kop */
+.kop{position:sticky;top:0;z-index:20;background:var(--hoof);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
+:root[data-theme="dark"] .kop{background:#123b39}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .kop{background:#123b39}}
+.kop .titel{flex:1;min-width:0}
+.kop h1{font-size:1.05rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kop .wie{font-size:.78rem;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sinc{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border:0;border-radius:999px;padding:6px 10px;color:#fff;font-size:.8rem;cursor:pointer}
+.sinc .kol{width:8px;height:8px;border-radius:50%;background:#7fe0b0}
+.sinc.besig .kol{background:var(--amber);animation:pols 1s infinite}
+.sinc.fout .kol{background:#ff8a7e}
+@keyframes pols{50%{opacity:.3}}
+.vorder{position:fixed;top:0;left:0;height:3px;background:var(--amber);z-index:50;width:0;transition:width .3s}
+
+main{padding:14px 16px 24px;max-width:720px;margin:0 auto}
+
+/* navigasie */
+nav.onder{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--kaart);border-top:1px solid var(--lyn);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav.onder button{flex:1;height:var(--nav);border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:.72rem;color:var(--sag);cursor:pointer}
+nav.onder button svg{width:24px;height:24px}
+nav.onder button.aan{color:var(--hoof);font-weight:700}
+nav.onder button.aan svg{stroke-width:2.4}
+nav.onder .ster{position:relative}
+nav.onder .ster b{position:absolute;top:-4px;right:-10px;background:var(--fout);color:#fff;border-radius:999px;font-size:.62rem;padding:1px 5px;font-weight:700}
+
+/* kaarte */
+.kaart{background:var(--kaart);border-radius:var(--r);box-shadow:var(--skadu);padding:14px;margin-bottom:12px}
+.kaart.plat{box-shadow:none;border:1px solid var(--lyn)}
+.ry{display:flex;align-items:center;gap:10px}
+.ry.tussen{justify-content:space-between}
+.stapel>*+*{margin-top:10px}
+.afdeling{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--sag);font-weight:700;margin:18px 2px 8px}
+
+/* knoppies */
+.kn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:10px 16px;border-radius:12px;border:1px solid var(--lyn);background:var(--kaart);font-weight:600;cursor:pointer;text-decoration:none}
+.kn:active{transform:scale(.98)}
+.kn.hoof{background:var(--hoof);border-color:var(--hoof);color:#fff}
+:root[data-theme="dark"] .kn.hoof{color:#0e1514}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .kn.hoof{color:#0e1514}}
+.kn.amber{background:var(--amber);border-color:var(--amber);color:#2b1d05}
+.kn.gevaar{color:var(--fout);border-color:var(--fout-sag);background:var(--fout-sag)}
+.kn.vol{width:100%}
+.kn.klein{min-height:36px;padding:6px 12px;font-size:.88rem;border-radius:10px}
+.kn[disabled]{opacity:.5;pointer-events:none}
+.kn svg{width:20px;height:20px;flex:none}
+.knrooster{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.knrooster .kn{min-height:52px}
+
+/* skyfies vir modus */
+.skyfies{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.skyfies::-webkit-scrollbar{display:none}
+.skyf{flex:none;border:1px solid var(--lyn);background:var(--kaart);border-radius:999px;padding:8px 14px;font-weight:600;font-size:.9rem;cursor:pointer}
+.skyf.aan{background:var(--hoof);border-color:var(--hoof);color:#fff}
+:root[data-theme="dark"] .skyf.aan{color:#0e1514}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .skyf.aan{color:#0e1514}}
+
+/* vorms */
+label.veld{display:block}
+label.veld>span{display:block;font-size:.85rem;font-weight:600;color:var(--sag);margin:0 0 5px 2px}
+input.inv,select.inv,textarea.inv{width:100%;min-height:46px;padding:10px 12px;border-radius:12px;border:1px solid var(--lyn);background:var(--kaart2);outline:none}
+input.inv:focus,select.inv:focus,textarea.inv:focus{border-color:var(--hoof);box-shadow:0 0 0 3px var(--hoof-sag)}
+textarea.inv{min-height:70px;resize:vertical}
+.twee{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stapper{display:flex;align-items:stretch;border:1px solid var(--lyn);border-radius:12px;overflow:hidden;background:var(--kaart2)}
+.stapper button{width:56px;border:0;background:var(--hoof-sag);color:var(--hoof);font-size:1.5rem;font-weight:700;cursor:pointer}
+.stapper input{flex:1;min-width:0;border:0;background:none;text-align:center;font-size:1.3rem;font-weight:700;min-height:52px;outline:none}
+.skakel{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.skakel input{width:44px;height:26px;appearance:none;background:var(--lyn);border-radius:999px;position:relative;cursor:pointer;flex:none;transition:background .2s}
+.skakel input::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.skakel input:checked{background:var(--hoof)}
+.skakel input:checked::after{left:21px}
+.merk{display:flex;flex-wrap:wrap;gap:8px}
+.merk label{display:flex;align-items:center;gap:6px;border:1px solid var(--lyn);padding:8px 12px;border-radius:999px;cursor:pointer;font-size:.92rem}
+.merk input{accent-color:var(--hoof)}
+.fout-boodskap{background:var(--fout-sag);color:var(--fout);border-radius:10px;padding:10px 12px;font-size:.92rem}
+
+/* skandeerder */
+.kamera{position:relative;background:#081110;border-radius:var(--r);overflow:hidden;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;color:#cfe;margin-bottom:12px}
+.kamera video{width:100%;height:100%;object-fit:cover}
+.kamera #h5leser{width:100%}
+.kamera .raam{position:absolute;left:8%;right:8%;top:32%;bottom:32%;border:3px solid rgba(242,169,59,.95);border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.28);pointer-events:none}
+.kamera .raam::after{content:"";position:absolute;left:6%;right:6%;top:50%;height:2px;background:rgba(255,90,70,.85);animation:skandeer 1.6s ease-in-out infinite}
+@keyframes skandeer{0%,100%{transform:translateY(-22px)}50%{transform:translateY(22px)}}
+.kamera .leeg{text-align:center;padding:24px}
+.kamera .leeg svg{width:54px;height:54px;opacity:.8}
+.kamera .lig{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.5);border:0;color:#fff;border-radius:999px;width:44px;height:44px;cursor:pointer}
+.flits{animation:flits .5s}
+@keyframes flits{0%{box-shadow:0 0 0 4px var(--goed)}100%{box-shadow:none}}
+
+/* item-kaart */
+.item-kop{display:flex;gap:12px;align-items:flex-start}
+.item-kop .ikoon{width:46px;height:46px;border-radius:12px;background:var(--hoof-sag);color:var(--hoof);display:flex;align-items:center;justify-content:center;flex:none}
+.item-kop .ikoon svg{width:26px;height:26px}
+.item-kop h2{font-size:1.15rem}
+.totaal{font-size:2rem;font-weight:800;line-height:1;color:var(--hoof)}
+.voorraadlys{margin:12px 0 0;padding:0;list-style:none;border-top:1px solid var(--lyn)}
+.voorraadlys li{display:flex;justify-content:space-between;align-items:center;padding:9px 2px;border-bottom:1px solid var(--lyn);gap:10px}
+.voorraadlys li b{font-variant-numeric:tabular-nums}
+.etiket{display:inline-block;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--hoof-sag);color:var(--hoof);white-space:nowrap}
+.etiket.amber{background:var(--amber-sag);color:var(--waarsku)}
+.etiket.rooi{background:var(--fout-sag);color:var(--fout)}
+.etiket.groen{background:var(--goed-sag);color:var(--goed)}
+.etiket.grys{background:var(--kaart2);color:var(--sag);border:1px solid var(--lyn)}
+
+/* lyste */
+.lys{background:var(--kaart);border-radius:var(--r);box-shadow:var(--skadu);overflow:hidden}
+.lys .el{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--lyn);cursor:pointer;width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left}
+.lys .el:last-child{border-bottom:0}
+.lys .el:active{background:var(--kaart2)}
+.lys .el .hoof-teks{flex:1;min-width:0}
+.lys .el .hoof-teks b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lys .el .getal{font-weight:800;font-size:1.1rem;font-variant-numeric:tabular-nums;text-align:right}
+.lys .el.dof{opacity:.55}
+.leeg-lys{padding:28px 16px;text-align:center;color:var(--sag)}
+.soek{position:relative;margin-bottom:10px}
+.soek svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:var(--sag)}
+.soek input{padding-left:40px}
+.fab{position:fixed;right:18px;bottom:calc(var(--nav) + 16px + env(safe-area-inset-bottom));z-index:25;width:58px;height:58px;border-radius:18px;border:0;background:var(--amber);color:#2b1d05;box-shadow:0 6px 18px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.fab svg{width:28px;height:28px}
+
+/* teëls */
+.teëls{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.teël{background:var(--kaart);border-radius:var(--r);box-shadow:var(--skadu);padding:14px;border:0;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:8px;min-height:96px}
+.teël svg{width:26px;height:26px;color:var(--hoof)}
+.teël b{font-size:.98rem}
+.teël small{color:var(--sag)}
+
+/* blad (modal) */
+.dek{position:fixed;inset:0;background:rgba(10,18,17,.45);z-index:60;display:flex;align-items:flex-end;justify-content:center;animation:in .15s}
+.blad{background:var(--bg);width:100%;max-width:640px;max-height:92vh;border-radius:20px 20px 0 0;display:flex;flex-direction:column;animation:op .2s ease-out;padding-bottom:env(safe-area-inset-bottom)}
+@media (min-width:700px){.dek{align-items:center}.blad{border-radius:20px}}
+.blad-kop{display:flex;align-items:center;gap:10px;padding:14px 16px 10px;border-bottom:1px solid var(--lyn)}
+.blad-kop h2{flex:1;font-size:1.08rem}
+.blad-kop button{border:0;background:var(--kaart);width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.2rem}
+.blad-lyf{overflow-y:auto;padding:14px 16px 20px}
+@keyframes in{from{opacity:0}}
+@keyframes op{from{transform:translateY(40px)}}
+.toast{animation:toastIn .2s}@keyframes toastIn{from{transform:translateY(10px);opacity:0}}
+
+/* boodskappies */
+.toasts{position:fixed;left:0;right:0;bottom:calc(var(--nav) + 12px + env(safe-area-inset-bottom));z-index:80;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 16px}
+.toast{background:#14211f;color:#fff;padding:11px 16px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:.93rem;max-width:520px}
+.toast.goed{background:var(--goed)} .toast.fout{background:var(--fout)}
+:root[data-theme="dark"] .toast.goed,:root[data-theme="dark"] .toast.fout{color:#0e1514}
+
+/* aanmeld */
+.voorblad{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:24px 20px 40px;max-width:440px;margin:0 auto}
+.logo{width:64px;height:64px;border-radius:18px;background:var(--hoof);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+.logo svg{width:36px;height:36px;color:var(--amber)}
+.voorblad h1{font-size:1.6rem;margin-bottom:6px}
+
+/* etiket-voorskou */
+.voorskou{background:#fff;color:#000;border:1px dashed #b9b4a8;border-radius:6px;padding:8px;text-align:center;width:220px;margin:0 auto}
+.voorskou .n{font:700 12px Helvetica,Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.voorskou .s{font:9px Helvetica,Arial,sans-serif;color:#555}
+.voorskou svg{width:100%;height:56px;display:block;margin:4px 0}
+.voorskou .k{font:11px Helvetica,Arial,sans-serif}
+.tel-ry{display:flex;align-items:center;gap:8px}
+.tel-ry input{width:64px;text-align:center}
+details.gevorderd summary{cursor:pointer;color:var(--sag);font-size:.9rem;padding:6px 2px}
+</style>
+</head>
+<body>
+<div class="vorder" id="vorder"></div>
+<div id="app"></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   INSTELLING: plak jou Apps Script Web app-URL tussen die aanhalingstekens.
+   (Jy kan dit ook in die toep self invul by die eerste oopmaak.)
+   ===================================================================== */
+const STANDAARD_API = '';
+
+/* ---------------------------------------------------------------------
+   Klein hulpies
+--------------------------------------------------------------------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const stoor = {
+  kry(k, s = null) { try { const v = localStorage.getItem(k); return v === null ? s : JSON.parse(v); } catch (e) { return s; } },
+  stel(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } },
+  vee(k) { try { localStorage.removeItem(k); } catch (e) { } }
+};
+const fmtN = n => { const v = Math.round((Number(n) || 0) * 100) / 100; return String(v).replace('.', ','); };
+const twee = n => String(n).padStart(2, '0');
+const fmtD = iso => { if (!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : `${twee(d.getDate())}/${twee(d.getMonth() + 1)}/${d.getFullYear()}`; };
+const fmtDT = iso => { if (!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : `${fmtD(iso)} ${twee(d.getHours())}:${twee(d.getMinutes())}`; };
+const isoDag = d => `${d.getFullYear()}-${twee(d.getMonth() + 1)}-${twee(d.getDate())}`;
+const getal = v => { const n = Number(String(v ?? '').replace(',', '.')); return isNaN(n) ? NaN : n; };
+
+const IK = {
+  skandeer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>',
+  voorraad: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>',
+  leen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>',
+  etiket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
+  meer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+  fles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21.5h11.6a2 2 0 0 0 1.7-3L14 9V3M7 15h10"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  soek: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  kamera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  gebreek: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21.5h11.6a2 2 0 0 0 1.7-3L14 9V3"/><path d="m11 12 2 3-2 2 1.5 3"/></svg>',
+  pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+  klok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  plek: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>',
+  mense: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/></svg>',
+  rat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+  sleutel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3"/></svg>',
+  uit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
+  flits: '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
+  dok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>'
+};
+
+/* ---------------------------------------------------------------------
+   Toestand (alles in die foon se geheue)
+--------------------------------------------------------------------- */
+const K = { api: 'dva_api', token: 'dva_token', kas: 'dva_kas', werk: 'dva_werk', modus: 'dva_modus', vinnig: 'dva_vinnig', etiket: 'dva_etiket' };
+let API = stoor.kry(K.api, '') || STANDAARD_API;
+const S = {
+  token: stoor.kry(K.token, ''),
+  gebruiker: null, liggings: [], items: [], voorraad: [], uitlenings: [], gebreek: [], log: [], gebruikers: [],
+  instellings: { skool: '', eposAan: true },
+  blad: 'skandeer', gelaai: null, sincFout: false
+};
+let IX = { item: new Map(), lig: new Map() };
+
+function herIndekseer() {
+  IX.item = new Map(S.items.map(i => [i.barcode, i]));
+  IX.lig = new Map(S.liggings.map(l => [l.id, l]));
+}
+const isAdmin = () => S.gebruiker?.rol === 'admin';
+const ligNaam = id => IX.lig.get(id)?.naam || '(onbekend)';
+const aktieweLiggings = () => S.liggings.filter(l => l.aktief).sort((a, b) => a.naam.localeCompare(b.naam));
+const myLiggings = () => aktieweLiggings().filter(l => isAdmin() || (S.gebruiker?.liggings || []).includes(l.id));
+const magLig = id => isAdmin() || (S.gebruiker?.liggings || []).includes(id);
+const voorraadVan = (bc, lid) => S.voorraad.find(v => v.barcode === bc && v.liggingId === lid)?.hoeveelheid || 0;
+const voorraadRye = bc => S.voorraad.filter(v => v.barcode === bc && magLig(v.liggingId) && IX.lig.get(v.liggingId)?.aktief);
+const totaalVan = bc => voorraadRye(bc).reduce((s, v) => s + v.hoeveelheid, 0);
+const oopLenings = bc => S.uitlenings.filter(l => l.status === 'oop' && (!bc || l.barcode === bc));
+const isLaat = l => l.status === 'oop' && l.terugDatum && new Date(l.terugDatum) < new Date();
+const uitstaande = l => Math.round((l.hoeveelheid - l.terugGegee) * 100) / 100;
+
+function werkLigging() {
+  const m = myLiggings();
+  let id = stoor.kry(K.werk, '');
+  if (!m.find(l => l.id === id)) id = m[0]?.id || '';
+  return id;
+}
+
+function bewaarKas() {
+  stoor.stel(K.kas, {
+    gebruiker: S.gebruiker, liggings: S.liggings, items: S.items, voorraad: S.voorraad, uitlenings: S.uitlenings,
+    gebreek: S.gebreek, log: S.log.slice(-400), gebruikers: S.gebruikers, instellings: S.instellings, gelaai: S.gelaai
+  });
+}
+
+/* ---------------------------------------------------------------------
+   Kommunikasie met die bediener
+--------------------------------------------------------------------- */
+let besig = 0;
+function vorder(aan) {
+  besig += aan ? 1 : -1;
+  const v = $('#vorder');
+  v.style.width = besig > 0 ? '70%' : '100%';
+  if (besig <= 0) { besig = 0; setTimeout(() => { if (!besig) v.style.width = '0'; }, 250); }
+  const s = $('.sinc');
+  if (s) { s.classList.toggle('besig', besig > 0); s.classList.toggle('fout', !besig && S.sincFout); }
+}
+
+async function api(aksie, data = {}) {
+  if (!API) throw new Error('Die bediener-URL is nie ingestel nie.');
+  vorder(true);
+  try {
+    let antw;
+    try {
+      const r = await fetch(API, {
+        method: 'POST', redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ aksie, token: S.token, data })
+      });
+      antw = await r.json();
+    } catch (e) {
+      S.sincFout = true;
+      throw new Error(navigator.onLine === false ? 'Geen internet nie. Probeer weer.' : 'Kon nie die bediener bereik nie. Kontroleer die internet en probeer weer.');
+    }
+    S.sincFout = false;
+    if (!antw.ok) {
+      if (String(antw.fout).startsWith('MELD_AAN:')) { meldAf(String(antw.fout).slice(9).trim()); throw new Error(String(antw.fout).slice(9).trim()); }
+      throw new Error(antw.fout || 'Onbekende fout');
+    }
+    return antw.data;
+  } finally { vorder(false); }
+}
+
+// Skryf-aksies loop een-vir-een in volgorde (belangrik met vinnige skandering)
+let ketting = Promise.resolve();
+let wagtend = 0;
+function skryf(aksie, data) {
+  wagtend++;
+  const p = ketting.then(() => api(aksie, data)).then(res => { pasToe(res); return res; })
+    .finally(() => { wagtend--; });
+  ketting = p.catch(() => { });
+  return p;
+}
+
+function upsert(lys, rek, sleutel) {
+  const i = lys.findIndex(sleutel);
+  if (i >= 0) lys[i] = rek; else lys.push(rek);
+}
+function pasToe(res) {
+  if (!res) return;
+  (res.voorraad || []).forEach(v => upsert(S.voorraad, v, x => x.barcode === v.barcode && x.liggingId === v.liggingId));
+  if (res.item) upsert(S.items, res.item, x => x.barcode === res.item.barcode);
+  if (res.uitleen) upsert(S.uitlenings, res.uitleen, x => x.id === res.uitleen.id);
+  if (res.gebreek) upsert(S.gebreek, res.gebreek, x => x.id === res.gebreek.id);
+  if (res.ligging) upsert(S.liggings, res.ligging, x => x.id === res.ligging.id);
+  if (res.gebruiker) {
+    if (isAdmin()) upsert(S.gebruikers, res.gebruiker, x => x.id === res.gebruiker.id);
+    if (res.gebruiker.id === S.gebruiker?.id) S.gebruiker = res.gebruiker;
+  }
+  herIndekseer();
+  bewaarKas();
+}
+function plaaslikeLog(aksie, barcode, liggingId, hoeveelheid, nota) {
+  S.log.push({ tyd: new Date().toISOString(), gebruiker: S.gebruiker?.naam || '', aksie, barcode, liggingId, hoeveelheid, nota: nota || '' });
+}
+
+async function laaiAlles(stil) {
+  try {
+    const d = await api('laai');
+    Object.assign(S, {
+      gebruiker: d.gebruiker, liggings: d.liggings, items: d.items, voorraad: d.voorraad, uitlenings: d.uitlenings,
+      gebreek: d.gebreek, log: d.log, gebruikers: d.gebruikers || [], instellings: d.instellings, gelaai: new Date().toISOString()
+    });
+    herIndekseer();
+    bewaarKas();
+    if (S.gebruiker.moetVerander) return wysVeranderWagwoord(true);
+    teken();
+    if (!stil) toast('Data is opgedateer', 'goed');
+  } catch (e) {
+    if (S.token) { teken(); toast(e.message, 'fout'); }
+  }
+}
+
+function meldAf(boodskap) {
+  Skandeerder.stop();
+  S.token = ''; S.gebruiker = null;
+  stoor.vee(K.token); stoor.vee(K.kas);
+  sluitAlleBlaaie();
+  wysAanmeld(boodskap);
+}
+
+/* ---------------------------------------------------------------------
+   Boodskappies, blaaie (modals) en klank
+--------------------------------------------------------------------- */
+function toast(t, soort = '') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + soort;
+  el.textContent = t;
+  const h = $('#toasts');
+  h.appendChild(el);
+  while (h.children.length > 2) h.firstElementChild.remove();
+  setTimeout(() => el.remove(), soort === 'fout' ? 5200 : 2600);
+}
+
+const blaaie = [];
+function maakBlad(titel, html, by) {
+  const dek = document.createElement('div');
+  dek.className = 'dek';
+  dek.innerHTML = `<div class="blad" role="dialog" aria-modal="true"><div class="blad-kop"><h2>${esc(titel)}</h2><button aria-label="Maak toe">✕</button></div><div class="blad-lyf">${html}</div></div>`;
+  document.body.appendChild(dek);
+  const blad = { dek, lyf: $('.blad-lyf', dek), toe: null };
+  const sluit = () => {
+    dek.remove();
+    const i = blaaie.indexOf(blad); if (i >= 0) blaaie.splice(i, 1);
+    if (blad.toe) blad.toe();
+    if (!blaaie.length) Skandeerder.hervat();
+  };
+  blad.sluit = sluit;
+  $('.blad-kop button', dek).onclick = sluit;
+  dek.addEventListener('click', e => { if (e.target === dek) sluit(); });
+  blaaie.push(blad);
+  Skandeerder.pouse();
+  if (by) by(blad);
+  const eerste = $('input:not([type=checkbox]):not([readonly]),select,textarea', blad.lyf);
+  if (eerste && eerste.dataset.fokus !== 'nee' && !matchMedia('(pointer:coarse)').matches) eerste.focus();
+  return blad;
+}
+function sluitAlleBlaaie() { while (blaaie.length) blaaie[blaaie.length - 1].sluit(); }
+
+let klank;
+function piep(goed = true) {
+  try {
+    klank = klank || new (window.AudioContext || window.webkitAudioContext)();
+    const o = klank.createOscillator(), g = klank.createGain();
+    o.frequency.value = goed ? 1250 : 330; o.type = 'square';
+    g.gain.setValueAtTime(.08, klank.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, klank.currentTime + (goed ? .09 : .25));
+    o.connect(g); g.connect(klank.destination); o.start(); o.stop(klank.currentTime + .26);
+  } catch (e) { }
+  if (navigator.vibrate) navigator.vibrate(goed ? 40 : [80, 60, 80]);
+}
+
+function bevestig(vraag, jaTeks = 'Ja', gevaar = false) {
+  return new Promise(res => {
+    let antwoord = false;
+    const b = maakBlad('Seker?', `<p style="margin-top:0">${esc(vraag)}</p><div class="twee"><button class="kn" data-n>Kanselleer</button><button class="kn ${gevaar ? 'gevaar' : 'hoof'}" data-j>${esc(jaTeks)}</button></div>`);
+    b.toe = () => res(antwoord);
+    $('[data-n]', b.lyf).onclick = () => b.sluit();
+    $('[data-j]', b.lyf).onclick = () => { antwoord = true; b.sluit(); };
+  });
+}
+
+/* Knoppie wat besig is: voorkom dubbel-druk */
+async function metKnop(kn, fn) {
+  if (kn.disabled) return;
+  const teks = kn.innerHTML;
+  kn.disabled = true; kn.innerHTML = 'Besig…';
+  try { await fn(); } finally { if (kn.isConnected) { kn.disabled = false; kn.innerHTML = teks; } }
+}
+function wysFout(houer, e) {
+  let f = $('.fout-boodskap', houer);
+  if (!f) { f = document.createElement('div'); f.className = 'fout-boodskap'; houer.prepend(f); }
+  f.textContent = e.message || String(e);
+  f.scrollIntoView({ block: 'nearest' });
+  piep(false);
+}
+
+/* ---------------------------------------------------------------------
+   Voorblaaie: bediener, opstel, aanmeld, wagwoord
+--------------------------------------------------------------------- */
+const LOGO = `<div class="logo">${IK.fles}</div>`;
+
+function wysBedienerOpstel(fout) {
+  document.body.style.paddingBottom = '0';
+  $('#app').innerHTML = `<div class="voorblad">${LOGO}
+    <h1>Koppel aan die bediener</h1>
+    <p class="sag">Plak die <b>Web app-URL</b> van jou Apps Script hier. Dit eindig op <span class="mono">/exec</span>.</p>
+    <form class="stapel" id="v">
+      ${fout ? `<div class="fout-boodskap">${esc(fout)}</div>` : ''}
+      <label class="veld"><span>Web app-URL</span><input class="inv mono" name="url" required placeholder="https://script.google.com/macros/s/…/exec" value="${esc(API)}" autocomplete="off"></label>
+      <button class="kn hoof vol">Koppel</button>
+    </form></div>`;
+  $('#v').onsubmit = async e => {
+    e.preventDefault();
+    const url = e.target.url.value.trim();
+    if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(url)) return wysBedienerOpstel('Dit lyk nie soos \'n Apps Script-URL nie.');
+    API = url;
+    await metKnop($('button', e.target), async () => {
+      try { const s = await api('status'); stoor.stel(K.api, API); s.moetOpstel ? wysAdminOpstel() : wysAanmeld(); }
+      catch (err) { wysBedienerOpstel(err.message); }
+    });
+  };
+}
+
+function wysAdminOpstel(fout) {
+  document.body.style.paddingBottom = '0';
+  $('#app').innerHTML = `<div class="voorblad">${LOGO}
+    <h1>Eerste opstel</h1>
+    <p class="sag">Skep die <b>admin</b>-rekening. Die opstelkode is in die Google Sheet se blad <b>Instellings</b>.</p>
+    <form class="stapel" id="v">
+      ${fout ? `<div class="fout-boodskap">${esc(fout)}</div>` : ''}
+      <label class="veld"><span>Opstelkode</span><input class="inv mono" name="kode" inputmode="numeric" required></label>
+      <label class="veld"><span>Skool se naam</span><input class="inv" name="skool" placeholder="bv. Hoërskool Voorbeeld"></label>
+      <label class="veld"><span>Jou naam</span><input class="inv" name="naam" required autocomplete="name"></label>
+      <label class="veld"><span>E-pos</span><input class="inv" name="epos" type="email" required autocomplete="email"></label>
+      <label class="veld"><span>Wagwoord (minstens 6 karakters)</span><input class="inv" name="wagwoord" type="password" minlength="6" required autocomplete="new-password"></label>
+      <button class="kn hoof vol">Skep admin</button>
+      <button type="button" class="kn vol" id="url">Verander bediener-URL</button>
+    </form></div>`;
+  $('#url').onclick = () => wysBedienerOpstel();
+  $('#v').onsubmit = async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    await metKnop($('button', e.target), async () => {
+      try { const r = await api('skepAdmin', f); naAanmeld(r); }
+      catch (err) { wysFout(e.target, err); }
+    });
+  };
+}
+
+function wysAanmeld(boodskap) {
+  document.body.style.paddingBottom = '0';
+  const skool = stoor.kry(K.kas, {})?.instellings?.skool || '';
+  $('#app').innerHTML = `<div class="voorblad">${LOGO}
+    <h1>Lab Voorraad</h1>
+    <p class="sag">${esc(skool || 'Meld aan om voort te gaan.')}</p>
+    <form class="stapel" id="v">
+      ${boodskap ? `<div class="fout-boodskap">${esc(boodskap)}</div>` : ''}
+      <label class="veld"><span>E-pos</span><input class="inv" name="epos" type="email" required autocomplete="username"></label>
+      <label class="veld"><span>Wagwoord</span><input class="inv" name="wagwoord" type="password" required autocomplete="current-password"></label>
+      <button class="kn hoof vol">Meld aan</button>
+      <p class="sag klein" style="text-align:center">Wagwoord vergeet? Vra die admin om dit te herstel.</p>
+      <button type="button" class="kn vol klein" id="url">Verander bediener-URL</button>
+    </form></div>`;
+  $('#url').onclick = () => wysBedienerOpstel();
+  $('#v').onsubmit = async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    await metKnop($('button', e.target), async () => {
+      try { const r = await api('meldAan', f); naAanmeld(r); }
+      catch (err) { wysFout(e.target, err); }
+    });
+  };
+}
+
+function naAanmeld(r) {
+  S.token = r.token; S.gebruiker = r.gebruiker;
+  stoor.stel(K.token, r.token);
+  if (r.gebruiker.moetVerander) return wysVeranderWagwoord(true);
+  $('#app').innerHTML = `<div class="voorblad">${LOGO}<h1>Laai data…</h1><p class="sag">Een oomblik.</p></div>`;
+  laaiAlles(true);
+}
+
+function wysVeranderWagwoord(verpligtend) {
+  const html = `<form class="stapel" id="ww">
+    ${verpligtend ? '<p class="sag" style="margin:0">Jy gebruik \'n tydelike wagwoord. Kies asseblief jou eie.</p>' : ''}
+    <label class="veld"><span>Huidige (of tydelike) wagwoord</span><input class="inv" name="oud" type="password" required autocomplete="current-password"></label>
+    <label class="veld"><span>Nuwe wagwoord</span><input class="inv" name="nuut" type="password" minlength="6" required autocomplete="new-password"></label>
+    <label class="veld"><span>Herhaal nuwe wagwoord</span><input class="inv" name="nuut2" type="password" minlength="6" required autocomplete="new-password"></label>
+    <button class="kn hoof vol">Stoor wagwoord</button>
+    ${verpligtend ? '<button type="button" class="kn vol klein" id="af">Meld af</button>' : ''}
+  </form>`;
+  const doen = async (form) => {
+    const f = Object.fromEntries(new FormData(form));
+    if (f.nuut !== f.nuut2) return wysFout(form, new Error('Die nuwe wagwoorde stem nie ooreen nie.'));
+    await metKnop($('button', form), async () => {
+      try {
+        const r = await api('verander_wagwoord', { oud: f.oud, nuut: f.nuut });
+        S.gebruiker = r.gebruiker;
+        toast('Wagwoord verander', 'goed');
+        if (verpligtend) naAanmeld({ token: S.token, gebruiker: r.gebruiker }); else sluitAlleBlaaie();
+      } catch (err) { wysFout(form, err); }
+    });
+  };
+  if (verpligtend) {
+    document.body.style.paddingBottom = '0';
+    $('#app').innerHTML = `<div class="voorblad">${LOGO}<h1>Nuwe wagwoord</h1>${html}</div>`;
+    $('#af').onclick = () => meldAf();
+    $('#ww').onsubmit = e => { e.preventDefault(); doen(e.target); };
+  } else {
+    const b = maakBlad('Verander wagwoord', html);
+    $('#ww', b.lyf).onsubmit = e => { e.preventDefault(); doen(e.target); };
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Hoofraam
+--------------------------------------------------------------------- */
+const BLAAIE = [
+  ['skandeer', 'Skandeer', IK.skandeer], ['voorraad', 'Voorraad', IK.voorraad],
+  ['uitleen', 'Uitleen', IK.leen], ['etikette', 'Etikette', IK.etiket], ['meer', 'Meer', IK.meer]
+];
+
+function teken() {
+  if (!S.gebruiker) return wysAanmeld();
+  document.body.style.paddingBottom = '';
+  if (!$('#raam')) {
+    $('#app').innerHTML = `<div id="raam">
+      <header class="kop"><div class="titel"><h1 id="kopTitel"></h1><div class="wie" id="kopWie"></div></div>
+        <button class="sinc" id="sinc" title="Laai weer van die bediener"><span class="kol"></span><span id="sincTeks"></span></button></header>
+      <main id="inhoud"></main>
+      <nav class="onder" id="nav"></nav></div>`;
+    $('#sinc').onclick = () => laaiAlles(false);
+  }
+  $('#kopTitel').textContent = S.instellings.skool || 'Lab Voorraad';
+  $('#kopWie').textContent = `${S.gebruiker.naam} · ${isAdmin() ? 'Admin' : 'Onderwyser'}`;
+  $('#sincTeks').textContent = S.gelaai ? new Date(S.gelaai).toTimeString().slice(0, 5) : '—';
+  const laat = oopLenings().filter(isLaat).length;
+  $('#nav').innerHTML = BLAAIE.map(([k, n, ik]) =>
+    `<button data-b="${k}" class="${S.blad === k ? 'aan' : ''}"><span class="ster">${ik}${k === 'uitleen' && laat ? `<b>${laat}</b>` : ''}</span>${n}</button>`).join('');
+  $$('#nav button').forEach(b => b.onclick = () => { S.blad = b.dataset.b; teken(); window.scrollTo(0, 0); });
+  if (S.blad !== 'skandeer') Skandeerder.stop();
+  // Moenie die kamera-aansig vervang terwyl die kamera loop nie — net die resultaat
+  if (S.blad === 'skandeer' && Skandeerder.aan && $('#resultaat')) { if (laasteKode) wysResultaat(laasteKode); return; }
+  ({ skandeer: tekenSkandeer, voorraad: tekenVoorraad, uitleen: tekenUitleen, etikette: tekenEtikette, meer: tekenMeer })[S.blad]();
+}
+
+function ligKeuse(naam, gekies, lys = myLiggings(), leeg) {
+  return `<select class="inv" name="${naam}">${leeg ? `<option value="">${esc(leeg)}</option>` : ''}${lys.map(l => `<option value="${esc(l.id)}" ${l.id === gekies ? 'selected' : ''}>${esc(l.naam)}${l.tipe ? ' · ' + esc(l.tipe) : ''}</option>`).join('')}</select>`;
+}
+
+/* ---------------------------------------------------------------------
+   SKANDEER
+--------------------------------------------------------------------- */
+const MODUSSE = [
+  ['kyk', 'Kyk'], ['in', 'In'], ['uit', 'Uit'], ['leen', 'Leen uit'], ['gebreek', 'Gebreek'], ['tel', 'Tel']
+];
+let laasteKode = '';
+
+function tekenSkandeer() {
+  const modus = stoor.kry(K.modus, 'kyk');
+  const vinnig = stoor.kry(K.vinnig, false);
+  const m = myLiggings();
+  if (!m.length) {
+    $('#inhoud').innerHTML = `<div class="kaart"><h2>Nog geen ligging nie</h2><p class="sag">${isAdmin() ? 'Voeg eers \'n lab of klas by onder <b>Meer → Liggings</b>.' : 'Die admin het jou nog nie aan \'n klas of lab gekoppel nie.'}</p>${isAdmin() ? '<button class="kn hoof" id="gaan">Voeg ligging by</button>' : ''}</div>`;
+    if (isAdmin()) $('#gaan').onclick = () => wysLiggings();
+    return;
+  }
+  $('#inhoud').innerHTML = `
+    <div class="kaart stapel">
+      <label class="veld"><span>Ek werk in</span>${ligKeuse('werk', werkLigging())}</label>
+      <div class="skyfies" id="modusse">${MODUSSE.map(([k, n]) => `<button class="skyf ${k === modus ? 'aan' : ''}" data-m="${k}">${n}</button>`).join('')}</div>
+      <label class="skakel ${modus === 'in' || modus === 'uit' ? '' : 'verberg'}" id="vinnigRy"><input type="checkbox" id="vinnig" ${vinnig ? 'checked' : ''}><span><b>Vinnige modus</b> <span class="sag klein">— elke skandering tel dadelik ${modus === 'uit' ? 'af' : 'by'}</span></span></label>
+      <div class="tel-ry ${vinnig && (modus === 'in' || modus === 'uit') ? '' : 'verberg'}" id="vinnigHv"><span class="sag klein">Hoeveel per skandering:</span><input class="inv" id="perSkan" type="number" inputmode="decimal" min="0.01" step="any" value="${stoor.kry('dva_perskan', 1)}"></div>
+    </div>
+    <div class="kamera" id="kamera"><div class="leeg">${IK.kamera}<p>Druk <b>Begin kamera</b> en hou die strepieskode in die raam.</p></div></div>
+    <div class="twee" style="margin-bottom:12px"><button class="kn hoof" id="kamKnop">${IK.kamera}<span>Begin kamera</span></button>
+      <button class="kn" id="soekKnop">${IK.soek}<span>Soek item</span></button></div>
+    <form id="tik" class="soek"><span>${IK.skandeer}</span><input class="inv mono" id="kode" placeholder="Tik kode of gebruik 'n skandeerder" autocomplete="off" autocapitalize="characters" enterkeyhint="go"></form>
+    <div id="resultaat"></div>`;
+
+  $('select[name=werk]').onchange = e => { stoor.stel(K.werk, e.target.value); if (laasteKode) wysResultaat(laasteKode); };
+  const wysVinnig = () => {
+    const md = stoor.kry(K.modus, 'kyk'), telbaar = md === 'in' || md === 'uit';
+    $('#vinnigRy').classList.toggle('verberg', !telbaar);
+    $('#vinnigRy .klein').textContent = `— elke skandering tel dadelik ${md === 'uit' ? 'af' : 'by'}`;
+    $('#vinnigHv').classList.toggle('verberg', !(telbaar && $('#vinnig').checked));
+  };
+  $$('#modusse .skyf').forEach(b => b.onclick = () => {
+    stoor.stel(K.modus, b.dataset.m);
+    $$('#modusse .skyf').forEach(x => x.classList.toggle('aan', x === b));
+    wysVinnig();
+  });
+  $('#vinnig').onchange = e => { stoor.stel(K.vinnig, e.target.checked); wysVinnig(); };
+  $('#perSkan').onchange = e => stoor.stel('dva_perskan', getal(e.target.value) > 0 ? getal(e.target.value) : 1);
+  $('#tik').onsubmit = e => { e.preventDefault(); const k = $('#kode').value.trim(); if (k) { $('#kode').value = ''; hanteerKode(k, true); } };
+  $('#soekKnop').onclick = () => kiesItem({ titel: 'Soek item', by: it => hanteerKode(it.barcode, true) });
+  const begin = () => Skandeerder.begin($('#kamera'), k => hanteerKode(k, false)).then(ok => { if (ok) kamKnop(true); });
+  const kamKnop = aan => { const k = $('#kamKnop'); if (!k) return; k.innerHTML = aan ? `${IK.kamera}<span>Stop kamera</span>` : `${IK.kamera}<span>Begin kamera</span>`; k.classList.toggle('hoof', !aan); };
+  $('#kamKnop').onclick = () => { if (Skandeerder.aan) { Skandeerder.stop(); kamKnop(false); tekenSkandeer(); } else begin(); };
+  Skandeerder.opStop = () => kamKnop(false);
+  if (laasteKode) wysResultaat(laasteKode);
+}
+
+function hanteerKode(kode, handmatig) {
+  kode = String(kode).trim();
+  laasteKode = kode;
+  const item = IX.item.get(kode) || S.items.find(i => i.barcode.toLowerCase() === kode.toLowerCase());
+  const modus = stoor.kry(K.modus, 'kyk');
+  const lig = werkLigging();
+  piep(!!item);
+  const kam = $('#kamera'); if (kam) { kam.classList.remove('flits'); void kam.offsetWidth; kam.classList.add('flits'); }
+
+  if (!item || !item.aktief) { wysResultaat(kode); return; }
+  laasteKode = item.barcode;
+
+  if (stoor.kry(K.vinnig, false) && (modus === 'in' || modus === 'uit') && !handmatig) {
+    const hv = stoor.kry('dva_perskan', 1);
+    const aksie = modus === 'in' ? 'voorraad_in' : 'voorraad_uit';
+    // Wys dadelik plaaslik, bevestig met bediener
+    const vorige = voorraadVan(item.barcode, lig);
+    const nuut = vorige + (modus === 'in' ? hv : -hv);
+    if (nuut < 0) { toast(`${item.naam}: nie genoeg voorraad nie (${fmtN(vorige)})`, 'fout'); piep(false); return wysResultaat(item.barcode); }
+    upsert(S.voorraad, { barcode: item.barcode, liggingId: lig, hoeveelheid: nuut }, x => x.barcode === item.barcode && x.liggingId === lig);
+    wysResultaat(item.barcode);
+    toast(`${modus === 'in' ? '+' : '−'}${fmtN(hv)} ${item.naam} → ${fmtN(nuut)}`, 'goed');
+    skryf(aksie, { barcode: item.barcode, liggingId: lig, hoeveelheid: hv, nota: 'Vinnige skandering' })
+      .then(() => { plaaslikeLog(modus === 'in' ? 'IN' : 'UIT', item.barcode, lig, hv, 'Vinnige skandering'); if (laasteKode === item.barcode && $('#resultaat')) wysResultaat(item.barcode); })
+      .catch(e => {
+        upsert(S.voorraad, { barcode: item.barcode, liggingId: lig, hoeveelheid: vorige }, x => x.barcode === item.barcode && x.liggingId === lig);
+        toast(`${item.naam}: ${e.message}`, 'fout'); piep(false);
+        laaiAlles(true);
+      });
+    return;
+  }
+  wysResultaat(item.barcode);
+  if (modus !== 'kyk') openAksie(modus, item.barcode, lig);
+}
+
+function wysResultaat(kode) {
+  const r = $('#resultaat'); if (!r) return;
+  const item = IX.item.get(kode);
+  if (!item || !item.aktief) {
+    r.innerHTML = `<div class="kaart stapel"><div class="item-kop"><div class="ikoon">${IK.soek}</div><div><h2>Onbekende kode</h2><div class="mono sag">${esc(kode)}</div></div></div>
+      <p class="sag" style="margin:0">${item && !item.aktief ? 'Hierdie item is verwyder.' : 'Hierdie strepieskode is nog nie in die stelsel nie.'}</p>
+      ${item && !item.aktief ? (isAdmin() ? '<button class="kn hoof vol" id="herstel">Herstel item</button>' : '') : `<button class="kn hoof vol" id="nuut">${IK.plus}<span>Voeg as nuwe item by</span></button>`}</div>`;
+    if ($('#nuut')) $('#nuut').onclick = () => wysItemVorm(null, kode);
+    if ($('#herstel')) $('#herstel').onclick = () => herstelItem(item);
+    return;
+  }
+  r.innerHTML = itemKaart(item, true);
+  koppelItemKaart(r, item);
+}
+
+/* ---------------------------------------------------------------------
+   Kamera-skandeerder: gebruik die foon se ingeboude leser (Android),
+   anders html5-qrcode (iPhone ens.)
+--------------------------------------------------------------------- */
+const Skandeerder = {
+  aan: false, gepouseer: false, stroom: null, lus: null, h5: null, laas: { k: '', t: 0 }, opKode: null, opStop: null,
+  async begin(houer, opKode) {
+    this.stop(true);
+    this.opKode = opKode; this.gepouseer = false;
+    if (!window.isSecureContext) { toast('Die kamera werk net op https://-adresse.', 'fout'); return false; }
+    houer.innerHTML = '<div class="leeg"><p>Begin kamera…</p></div>';
+    try {
+      if ('BarcodeDetector' in window) {
+        const wil = ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'itf', 'codabar'];
+        let formate = wil;
+        try { const ond = await BarcodeDetector.getSupportedFormats(); formate = wil.filter(f => ond.includes(f)); } catch (e) { }
+        if (formate.length) return await this.begininheems(houer, formate);
+      }
+      return await this.beginH5(houer);
+    } catch (e) {
+      this.stop();
+      houer.innerHTML = `<div class="leeg">${IK.kamera}<p>${esc(kameraFout(e))}</p></div>`;
+      return false;
+    }
+  },
+  async begininheems(houer, formate) {
+    const leser = new BarcodeDetector({ formats: formate });
+    this.stroom = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    houer.innerHTML = '<video playsinline muted autoplay></video><div class="raam"></div>';
+    const vid = $('video', houer);
+    vid.srcObject = this.stroom;
+    await vid.play();
+    this.aan = true;
+    const spoor = this.stroom.getVideoTracks()[0];
+    try {
+      if (spoor.getCapabilities && spoor.getCapabilities().torch) {
+        const kn = document.createElement('button'); kn.className = 'lig'; kn.innerHTML = IK.flits; kn.title = 'Flits';
+        let flits = false;
+        kn.onclick = () => { flits = !flits; spoor.applyConstraints({ advanced: [{ torch: flits }] }).catch(() => { }); };
+        houer.appendChild(kn);
+      }
+    } catch (e) { }
+    let besig = false;
+    this.lus = setInterval(async () => {
+      if (!this.aan || this.gepouseer || besig || vid.readyState < 2) return;
+      besig = true;
+      try { const r = await leser.detect(vid); if (r && r[0]) this.gevind(r[0].rawValue); } catch (e) { }
+      besig = false;
+    }, 140);
+    return true;
+  },
+  async beginH5(houer) {
+    if (!window.Html5Qrcode) {
+      houer.innerHTML = '<div class="leeg"><p>Laai skandeerder…</p></div>';
+      await laaiSkrip(['https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js', 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js']);
+    }
+    houer.innerHTML = '<div id="h5leser"></div>';
+    const F = window.Html5QrcodeSupportedFormats;
+    this.h5 = new Html5Qrcode('h5leser', {
+      verbose: false,
+      formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.QR_CODE, F.ITF, F.CODABAR],
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    });
+    await this.h5.start({ facingMode: 'environment' },
+      { fps: 12, qrbox: (w, h) => ({ width: Math.floor(Math.min(w * .86, 420)), height: Math.floor(Math.min(h * .45, 180)) }) },
+      txt => { if (!this.gepouseer) this.gevind(txt); }, () => { });
+    this.aan = true;
+    return true;
+  },
+  gevind(k) {
+    const nou = Date.now();
+    if (k === this.laas.k && nou - this.laas.t < 2200) return;
+    this.laas = { k, t: nou };
+    if (this.opKode) this.opKode(k);
+  },
+  pouse() { this.gepouseer = true; },
+  hervat() { this.gepouseer = false; this.laas.t = Date.now(); },
+  stop(stil) {
+    const was = this.aan;
+    this.aan = false;
+    clearInterval(this.lus); this.lus = null;
+    if (this.stroom) { this.stroom.getTracks().forEach(t => t.stop()); this.stroom = null; }
+    if (this.h5) { const h = this.h5; this.h5 = null; h.stop().then(() => h.clear()).catch(() => { }); }
+    if (was && !stil && this.opStop) this.opStop();
+  }
+};
+function kameraFout(e) {
+  const n = e && e.name;
+  if (n === 'NotAllowedError') return 'Toegang tot die kamera is geweier. Gee toestemming in die blaaier se instellings en probeer weer.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'Geen kamera gevind nie.';
+  if (n === 'NotReadableError') return 'Die kamera word deur \'n ander toep gebruik.';
+  return 'Kon nie die kamera begin nie. Jy kan die kode steeds hieronder intik.';
+}
+function laaiSkrip(urls) {
+  return urls.reduce((p, url) => p.catch(() => new Promise((ok, nee) => {
+    const s = document.createElement('script'); s.src = url; s.onload = ok; s.onerror = () => { s.remove(); nee(new Error('laai')); };
+    document.head.appendChild(s);
+  })), Promise.reject());
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (Skandeerder.aan) { Skandeerder.stop(); } }
+  else if (S.gebruiker && S.gelaai && Date.now() - new Date(S.gelaai) > 120000 && !blaaie.length) laaiAlles(true);
+});
+
+/* ---------------------------------------------------------------------
+   Item-kaart en aksies
+--------------------------------------------------------------------- */
+function itemKaart(item, metKnoppies) {
+  const rye = voorraadRye(item.barcode).sort((a, b) => ligNaam(a.liggingId).localeCompare(ligNaam(b.liggingId)));
+  const tot = totaalVan(item.barcode);
+  const lenings = oopLenings(item.barcode);
+  const laag = isAdmin() && item.minVoorraad > 0 && tot < item.minVoorraad;
+  return `<div class="kaart">
+    <div class="item-kop"><div class="ikoon">${IK.fles}</div>
+      <div style="flex:1;min-width:0"><h2>${esc(item.naam)}</h2>
+        <div class="sag klein"><span class="mono">${esc(item.barcode)}</span>${item.kategorie ? ' · ' + esc(item.kategorie) : ''}</div></div>
+      <div style="text-align:right"><div class="totaal">${fmtN(tot)}</div><div class="sag klein">${esc(item.eenheid || 'stuks')}${isAdmin() ? '' : ' in jou liggings'}</div></div></div>
+    ${laag ? `<p style="margin:10px 0 0"><span class="etiket amber">Lae voorraad · minimum ${fmtN(item.minVoorraad)}</span></p>` : ''}
+    <ul class="voorraadlys">${rye.length ? rye.map(v => `<li><span>${esc(ligNaam(v.liggingId))}</span><b>${fmtN(v.hoeveelheid)}</b></li>`).join('') : '<li class="sag">Nog geen voorraad in jou liggings nie.</li>'}
+    ${lenings.map(l => `<li><span><span class="etiket ${isLaat(l) ? 'rooi' : 'amber'}">${isLaat(l) ? 'Laat' : 'Uitgeleen'}</span> ${esc(ligNaam(l.vanLigging))} → ${esc(ligNaam(l.naLigging))}<br><span class="sag klein">${esc(l.persoon)} · terug ${fmtD(l.terugDatum)}</span></span><b>${fmtN(uitstaande(l))}</b></li>`).join('')}</ul>
+    ${metKnoppies ? `<div class="knrooster" style="margin-top:12px">
+      <button class="kn" data-a="in">＋ In</button><button class="kn" data-a="uit">－ Uit</button>
+      <button class="kn" data-a="leen">${IK.leen}<span>Leen uit</span></button><button class="kn" data-a="gebreek">${IK.gebreek}<span>Gebreek</span></button>
+      <button class="kn" data-a="tel">Tel / stel</button><button class="kn" data-a="meer">Meer…</button></div>` : ''}
+  </div>`;
+}
+function koppelItemKaart(houer, item) {
+  $$('[data-a]', houer).forEach(b => b.onclick = () => {
+    if (b.dataset.a === 'meer') return wysItemDetail(item.barcode);
+    openAksie(b.dataset.a, item.barcode, werkLigging());
+  });
+}
+
+const AKSIE_TITEL = { in: 'Voorraad in', uit: 'Voorraad uit', tel: 'Tel / stel voorraad', leen: 'Leen uit', gebreek: 'Meld gebreek' };
+
+function openAksie(modus, barcode, lig) {
+  const item = IX.item.get(barcode);
+  if (!item) return;
+  const m = myLiggings();
+  if (!m.length) return toast('Jy het nie toegang tot enige ligging nie.', 'fout');
+  if (!m.find(l => l.id === lig)) lig = m[0].id;
+  const terug = new Date(); terug.setDate(terug.getDate() + 7);
+  const huidig = voorraadVan(barcode, lig);
+  const stapper = (w = 1) => `<div class="stapper"><button type="button" data-d="-1">−</button><input name="hoeveelheid" type="number" inputmode="decimal" step="any" min="0" value="${w}" data-fokus="nee"><button type="button" data-d="1">+</button></div>`;
+  const ander = aktieweLiggings().filter(l => l.id !== lig);
+
+  let lyf = `<div class="ry tussen" style="margin-bottom:12px"><div><b>${esc(item.naam)}</b><div class="sag klein mono">${esc(item.barcode)}</div></div>
+    <div style="text-align:right"><div class="sag klein">Huidig hier</div><b id="huidig">${fmtN(huidig)}</b> <span class="sag klein">${esc(item.eenheid || '')}</span></div></div>
+    <form class="stapel" id="af">
+    <label class="veld"><span>${modus === 'leen' ? 'Leen uit van' : 'Ligging'}</span>${ligKeuse('lig', lig)}</label>`;
+  if (modus === 'tel') lyf += `<label class="veld"><span>Werklike telling</span>${stapper(huidig)}</label>`;
+  else lyf += `<label class="veld"><span>Hoeveelheid</span>${stapper(1)}</label>`;
+  if (modus === 'leen') {
+    lyf += `<label class="veld"><span>Leen uit na</span>${ligKeuse('na', '', ander, 'Kies lab / klas…')}</label>
+      <label class="veld"><span>Wie teken uit?</span><input class="inv" name="persoon" required placeholder="Naam en van" autocomplete="off"></label>
+      <div class="twee"><label class="veld"><span>E-pos (vir kwitansie)</span><input class="inv" name="epos" type="email" placeholder="opsioneel"></label>
+      <label class="veld"><span>Selfoon</span><input class="inv" name="selfoon" type="tel" placeholder="opsioneel"></label></div>
+      <label class="veld"><span>Terug teen</span><input class="inv" name="terugDatum" type="date" value="${isoDag(terug)}" min="${isoDag(new Date())}"></label>`;
+  }
+  if (modus === 'gebreek') lyf += `<label class="veld"><span>Wat het gebeur?</span><textarea class="inv" name="rede" placeholder="bv. Geval tydens prakties, gekraak"></textarea></label>`;
+  if (modus === 'in' || modus === 'uit' || modus === 'leen') lyf += `<label class="veld"><span>Nota</span><input class="inv" name="nota" placeholder="opsioneel"></label>`;
+  lyf += `<button class="kn ${modus === 'gebreek' ? 'gevaar' : 'hoof'} vol">${{ in: 'Voeg by voorraad', uit: 'Haal uit voorraad', tel: 'Stoor telling', leen: 'Leen uit', gebreek: 'Meld as gebreek' }[modus]}</button></form>`;
+
+  const b = maakBlad(AKSIE_TITEL[modus], lyf, blad => {
+    const f = $('#af', blad.lyf);
+    const hv = f.hoeveelheid;
+    $$('.stapper button', f).forEach(k => k.onclick = () => { const n = getal(hv.value) || 0; hv.value = Math.max(0, Math.round((n + Number(k.dataset.d)) * 100) / 100); });
+    f.lig.onchange = () => {
+      $('#huidig', blad.lyf).textContent = fmtN(voorraadVan(barcode, f.lig.value));
+      if (modus === 'tel') hv.value = voorraadVan(barcode, f.lig.value);
+      if (f.na) { const nu = f.na.value; f.na.outerHTML = ligKeuse('na', nu, aktieweLiggings().filter(l => l.id !== f.lig.value), 'Kies lab / klas…'); }
+    };
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(f));
+      const n = getal(d.hoeveelheid);
+      if (isNaN(n) || n < 0 || (modus !== 'tel' && n <= 0)) return wysFout(f, new Error('Gee \'n geldige hoeveelheid.'));
+      if (modus === 'leen' && !d.na) return wysFout(f, new Error('Kies waarheen dit uitgeleen word.'));
+      if ((modus === 'uit' || modus === 'leen' || modus === 'gebreek') && n > voorraadVan(barcode, d.lig)) {
+        return wysFout(f, new Error(`Daar is net ${fmtN(voorraadVan(barcode, d.lig))} by ${ligNaam(d.lig)}.`));
+      }
+      const kn = $('button.vol', f);
+      await metKnop(kn, async () => {
+        try {
+          if (modus === 'in' || modus === 'uit') {
+            await skryf(modus === 'in' ? 'voorraad_in' : 'voorraad_uit', { barcode, liggingId: d.lig, hoeveelheid: n, nota: d.nota });
+            plaaslikeLog(modus === 'in' ? 'IN' : 'UIT', barcode, d.lig, n, d.nota);
+            toast(`${modus === 'in' ? '+' : '−'}${fmtN(n)} ${item.naam}`, 'goed');
+          } else if (modus === 'tel') {
+            await skryf('voorraad_tel', { barcode, liggingId: d.lig, hoeveelheid: n });
+            plaaslikeLog('TEL', barcode, d.lig, n, '');
+            toast(`${item.naam}: telling ${fmtN(n)} gestoor`, 'goed');
+          } else if (modus === 'leen') {
+            const r = await skryf('leen_uit', { barcode, vanLigging: d.lig, naLigging: d.na, hoeveelheid: n, persoon: d.persoon, epos: d.epos, selfoon: d.selfoon, terugDatum: d.terugDatum, nota: d.nota });
+            plaaslikeLog('LEEN', barcode, d.lig, n, `${d.persoon} → ${ligNaam(d.na)}`);
+            toast(`${fmtN(n)} ${item.naam} uitgeleen aan ${d.persoon}${r.uitleen.epos ? ' (kwitansie gestuur)' : ''}`, 'goed');
+          } else if (modus === 'gebreek') {
+            await skryf('gebreek_meld', { barcode, liggingId: d.lig, hoeveelheid: n, rede: d.rede });
+            plaaslikeLog('GEBREEK', barcode, d.lig, n, d.rede);
+            toast(`${fmtN(n)} ${item.naam} as gebreek gemeld`, 'goed');
+          }
+          stoor.stel(K.werk, d.lig);
+          blad.sluit();
+          herteken();
+        } catch (err) { wysFout(f, err); }
+      });
+    };
+  });
+  return b;
+}
+
+function herteken() {
+  // Teken die huidige skerm oor sonder om die kamera te herbegin
+  teken();
+  if (S.blad === 'skandeer' && laasteKode) wysResultaat(laasteKode);
+  blaaie.forEach(b => b.herlaai && b.herlaai());
+}
+
+function wysItemDetail(barcode) {
+  const b = maakBlad('Item', '', blad => {
+    blad.herlaai = () => {
+      const item = IX.item.get(barcode);
+      if (!item) return blad.sluit();
+      const gesk = S.log.filter(l => l.barcode === barcode).slice(-25).reverse();
+      const breek = S.gebreek.filter(g => g.barcode === barcode).slice(-10).reverse();
+      blad.lyf.innerHTML = itemKaart(item, item.aktief) + `
+        <div class="twee" style="margin-bottom:12px"><button class="kn" id="wys">${IK.pen}<span>Wysig</span></button>
+        <button class="kn" id="etk">${IK.etiket}<span>Druk etiket</span></button></div>
+        ${item.beskrywing ? `<div class="kaart plat"><div class="sag klein">Beskrywing</div>${esc(item.beskrywing)}</div>` : ''}
+        ${breek.length ? `<div class="afdeling">Gebreek</div><div class="lys">${breek.map(g => `<div class="el"><div class="hoof-teks"><b>${esc(ligNaam(g.liggingId))} · ${fmtD(g.datum)}</b><span class="sag klein">${esc(g.rede || '—')} · ${esc(g.deur)}</span></div><span class="etiket ${g.status === 'aangemeld' ? 'rooi' : g.status === 'herstel' ? 'groen' : 'grys'}">${esc(g.status)}</span><div class="getal">${fmtN(g.hoeveelheid)}</div></div>`).join('')}</div>` : ''}
+        <div class="afdeling">Geskiedenis</div>
+        ${gesk.length ? `<div class="lys">${gesk.map(logRy).join('')}</div>` : '<div class="kaart plat sag">Nog niks nie.</div>'}
+        ${isAdmin() && item.aktief ? '<button class="kn gevaar vol" id="verw" style="margin-top:16px">Verwyder item</button>' : ''}
+        ${isAdmin() && !item.aktief ? '<button class="kn hoof vol" id="herst" style="margin-top:16px">Herstel item</button>' : ''}`;
+      koppelItemKaart(blad.lyf, item);
+      $('#wys', blad.lyf).onclick = () => wysItemVorm(item);
+      $('#etk', blad.lyf).onclick = () => { voegEtiketBy(item.barcode, 1); blad.sluit(); S.blad = 'etikette'; teken(); };
+      if ($('#verw', blad.lyf)) $('#verw', blad.lyf).onclick = async () => {
+        if (!await bevestig(`Verwyder "${item.naam}"? Dit sal nie meer gewys of geskandeer kan word nie. (Die geskiedenis bly in die Sheet.)`, 'Verwyder', true)) return;
+        try { await skryf('item_verwyder', { barcode }); toast('Item verwyder', 'goed'); herteken(); } catch (e) { toast(e.message, 'fout'); }
+      };
+      if ($('#herst', blad.lyf)) $('#herst', blad.lyf).onclick = () => herstelItem(item);
+    };
+    blad.herlaai();
+  });
+  return b;
+}
+async function herstelItem(item) {
+  try {
+    await skryf('item_stoor', { barcode: item.barcode, naam: item.naam, kategorie: item.kategorie, eenheid: item.eenheid, beskrywing: item.beskrywing, minVoorraad: item.minVoorraad, aktief: true });
+    toast('Item herstel', 'goed'); herteken();
+  } catch (e) { toast(e.message, 'fout'); }
+}
+
+function logRy(l) {
+  const it = IX.item.get(l.barcode);
+  const naam = { IN: 'In', UIT: 'Uit', TEL: 'Getel', LEEN: 'Uitgeleen', TERUG: 'Terug', GEBREEK: 'Gebreek', HERSTEL: 'Herstel', AFSKRYF: 'Afgeskryf', ITEM_NUUT: 'Nuwe item', ITEM_WYSIG: 'Item gewysig', ITEM_VERWYDER: 'Item verwyder' }[l.aksie] || l.aksie.replace(/_/g, ' ').toLowerCase();
+  const kleur = { IN: 'groen', TERUG: 'groen', HERSTEL: 'groen', UIT: 'amber', LEEN: 'amber', GEBREEK: 'rooi', AFSKRYF: 'rooi' }[l.aksie] || 'grys';
+  return `<div class="el" ${l.barcode && it ? `data-bc="${esc(l.barcode)}"` : ''}><div class="hoof-teks"><b>${esc(it ? it.naam : (l.nota || l.barcode || ''))}</b>
+    <span class="sag klein">${fmtDT(l.tyd)} · ${esc(l.gebruiker)}${l.liggingId ? ' · ' + esc(ligNaam(l.liggingId)) : ''}${l.nota && it ? ' · ' + esc(l.nota) : ''}</span></div>
+    <span class="etiket ${kleur}">${esc(naam)}</span>${l.hoeveelheid ? `<div class="getal">${fmtN(l.hoeveelheid)}</div>` : ''}</div>`;
+}
+
+/* Nuwe item / wysig */
+function wysItemVorm(item, kode) {
+  const nuut = !item;
+  const kategorieë = [...new Set(S.items.map(i => i.kategorie).filter(Boolean))].sort();
+  const eenhede = [...new Set(['stuks', 'stelle', 'ml', 'g', 'L', 'kg', 'bottels', 'dose', ...S.items.map(i => i.eenheid).filter(Boolean)])];
+  const html = `<form class="stapel" id="iv">
+    <label class="veld"><span>Naam *</span><input class="inv" name="naam" required value="${esc(item?.naam || '')}" placeholder="bv. Beker 250 ml (glas)"></label>
+    <label class="veld"><span>Strepieskode</span><input class="inv mono" name="barcode" value="${esc(item?.barcode || kode || '')}" ${nuut ? '' : 'readonly'} placeholder="Los leeg — die stelsel maak een (LAB00001…)"></label>
+    ${nuut ? '<p class="sag klein" style="margin:-4px 2px 0">Het die item reeds \'n fabriek-strepieskode? Skandeer of tik dit hier. Anders los dit leeg en druk later \'n etiket.</p>' : ''}
+    <div class="twee"><label class="veld"><span>Kategorie</span><input class="inv" name="kategorie" list="katlys" value="${esc(item?.kategorie || '')}" placeholder="bv. Glasware"><datalist id="katlys">${kategorieë.map(k => `<option value="${esc(k)}">`).join('')}</datalist></label>
+    <label class="veld"><span>Eenheid</span><input class="inv" name="eenheid" list="eenlys" value="${esc(item?.eenheid || 'stuks')}"><datalist id="eenlys">${eenhede.map(k => `<option value="${esc(k)}">`).join('')}</datalist></label></div>
+    <label class="veld"><span>Minimum voorraad (waarskuwing)</span><input class="inv" name="minVoorraad" type="number" inputmode="decimal" step="any" min="0" value="${item?.minVoorraad || 0}"></label>
+    <label class="veld"><span>Beskrywing</span><textarea class="inv" name="beskrywing" placeholder="opsioneel">${esc(item?.beskrywing || '')}</textarea></label>
+    ${nuut && myLiggings().length ? `<div class="kaart plat stapel" style="margin:0"><b>Beginvoorraad</b><div class="twee"><label class="veld"><span>Ligging</span>${ligKeuse('liggingId', werkLigging())}</label>
+      <label class="veld"><span>Hoeveelheid</span><input class="inv" name="hoeveelheid" type="number" inputmode="decimal" step="any" min="0" value="0"></label></div></div>` : ''}
+    ${nuut ? '<label class="skakel"><input type="checkbox" name="druk" checked><span>Voeg by etikette om te druk</span></label>' : ''}
+    <button class="kn hoof vol">${nuut ? 'Voeg item by' : 'Stoor veranderinge'}</button></form>`;
+  maakBlad(nuut ? 'Nuwe item' : 'Wysig item', html, blad => {
+    const f = $('#iv', blad.lyf);
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(f));
+      if (nuut && d.barcode && IX.item.has(d.barcode.trim())) return wysFout(f, new Error('Hierdie strepieskode bestaan reeds.'));
+      await metKnop($('button.vol', f), async () => {
+        try {
+          const r = await skryf('item_stoor', { ...d, isNuut: nuut, druk: undefined, hoeveelheid: getal(d.hoeveelheid) || 0 });
+          plaaslikeLog(nuut ? 'ITEM_NUUT' : 'ITEM_WYSIG', r.item.barcode, '', 0, r.item.naam);
+          if (nuut && getal(d.hoeveelheid) > 0) plaaslikeLog('IN', r.item.barcode, d.liggingId, getal(d.hoeveelheid), 'Beginvoorraad');
+          if (nuut && d.druk) voegEtiketBy(r.item.barcode, 1);
+          toast(nuut ? `${r.item.naam} bygevoeg (${r.item.barcode})` : 'Gestoor', 'goed');
+          blad.sluit();
+          if (nuut) laasteKode = r.item.barcode;
+          herteken();
+        } catch (err) { wysFout(f, err); }
+      });
+    };
+  });
+}
+
+/* Item-kieser */
+function kiesItem({ titel, by, veelvoudig }) {
+  return maakBlad(titel, `<div class="soek">${IK.soek}<input class="inv" id="ks" placeholder="Soek naam, kode of kategorie" autocomplete="off"></div><div id="kl"></div>`, blad => {
+    const teken = () => {
+      const q = $('#ks', blad.lyf).value.trim().toLowerCase();
+      const lys = S.items.filter(i => i.aktief && (!q || (i.naam + ' ' + i.barcode + ' ' + i.kategorie).toLowerCase().includes(q)))
+        .sort((a, b) => a.naam.localeCompare(b.naam)).slice(0, 60);
+      $('#kl', blad.lyf).innerHTML = lys.length ? `<div class="lys">${lys.map(i => `<button class="el" data-bc="${esc(i.barcode)}"><div class="hoof-teks"><b>${esc(i.naam)}</b><span class="sag klein mono">${esc(i.barcode)}</span></div><div class="getal">${fmtN(totaalVan(i.barcode))}</div></button>`).join('')}</div>` : '<div class="leeg-lys">Niks gevind nie.</div>';
+      $$('[data-bc]', blad.lyf).forEach(el => el.onclick = () => { const it = IX.item.get(el.dataset.bc); if (!veelvoudig) blad.sluit(); by(it); if (veelvoudig) { el.style.opacity = .4; } });
+    };
+    $('#ks', blad.lyf).oninput = teken;
+    teken();
+  });
+}
+
+/* ---------------------------------------------------------------------
+   VOORRAAD
+--------------------------------------------------------------------- */
+let vFilter = { q: '', lig: '', leeg: false };
+function tekenVoorraad() {
+  const m = myLiggings();
+  $('#inhoud').innerHTML = `
+    <div class="soek">${IK.soek}<input class="inv" id="vq" placeholder="Soek naam, kode of kategorie" value="${esc(vFilter.q)}" autocomplete="off"></div>
+    <div class="twee" style="margin-bottom:10px">${ligKeuse('vl', vFilter.lig, m, isAdmin() ? 'Alle liggings' : 'Al my liggings')}
+      <label class="skakel klein"><input type="checkbox" id="vleeg" ${vFilter.leeg ? 'checked' : ''}><span>Wys ook items sonder voorraad</span></label></div>
+    <div id="vlys"></div>
+    <button class="fab" id="nuweItem" aria-label="Nuwe item">${IK.plus}</button>`;
+  const lys = () => {
+    const q = vFilter.q.toLowerCase();
+    const items = S.items.filter(i => i.aktief && (!q || (i.naam + ' ' + i.barcode + ' ' + i.kategorie).toLowerCase().includes(q)))
+      .map(i => {
+        const hv = vFilter.lig ? voorraadVan(i.barcode, vFilter.lig) : totaalVan(i.barcode);
+        const geleen = oopLenings(i.barcode).filter(l => !vFilter.lig || l.vanLigging === vFilter.lig).reduce((s, l) => s + uitstaande(l), 0);
+        return { i, hv, geleen };
+      })
+      .filter(x => vFilter.leeg || q || x.hv > 0 || x.geleen > 0)
+      .sort((a, b) => (a.i.kategorie || '~').localeCompare(b.i.kategorie || '~') || a.i.naam.localeCompare(b.i.naam));
+    if (!items.length) {
+      $('#vlys').innerHTML = `<div class="kaart leeg-lys">${S.items.length ? 'Geen items pas nie.' : 'Nog geen items nie. Druk <b>+</b> om die eerste item by te voeg.'}</div>`;
+      return;
+    }
+    let kat = null, html = '';
+    items.forEach(({ i, hv, geleen }) => {
+      const k = i.kategorie || 'Sonder kategorie';
+      if (k !== kat) { if (kat !== null) html += '</div>'; html += `<div class="afdeling">${esc(k)}</div><div class="lys">`; kat = k; }
+      const laag = isAdmin() && i.minVoorraad > 0 && totaalVan(i.barcode) < i.minVoorraad;
+      html += `<button class="el ${hv > 0 ? '' : 'dof'}" data-bc="${esc(i.barcode)}"><div class="hoof-teks"><b>${esc(i.naam)}</b><span class="sag klein mono">${esc(i.barcode)}</span></div>
+        ${laag ? '<span class="etiket amber">Laag</span>' : ''}${geleen ? `<span class="etiket">${fmtN(geleen)} geleen</span>` : ''}<div class="getal">${fmtN(hv)}</div></button>`;
+    });
+    $('#vlys').innerHTML = html + '</div>';
+    $$('#vlys [data-bc]').forEach(el => el.onclick = () => wysItemDetail(el.dataset.bc));
+  };
+  $('#vq').oninput = e => { vFilter.q = e.target.value; lys(); };
+  $('select[name=vl]').onchange = e => { vFilter.lig = e.target.value; lys(); };
+  $('#vleeg').onchange = e => { vFilter.leeg = e.target.checked; lys(); };
+  $('#nuweItem').onclick = () => wysItemVorm(null);
+  lys();
+}
+
+/* ---------------------------------------------------------------------
+   UITLEEN
+--------------------------------------------------------------------- */
+let uOortjie = 'oop';
+function tekenUitleen() {
+  const oop = oopLenings().sort((a, b) => (a.terugDatum || '9').localeCompare(b.terugDatum || '9'));
+  const laat = oop.filter(isLaat);
+  const terug = S.uitlenings.filter(l => l.status !== 'oop').sort((a, b) => (b.terugOp || '').localeCompare(a.terugOp || '')).slice(0, 60);
+  const lys = { oop, laat, terug }[uOortjie];
+  $('#inhoud').innerHTML = `
+    <div class="skyfies" style="margin-bottom:12px">
+      <button class="skyf ${uOortjie === 'oop' ? 'aan' : ''}" data-o="oop">Uitstaande (${oop.length})</button>
+      <button class="skyf ${uOortjie === 'laat' ? 'aan' : ''}" data-o="laat">Laat (${laat.length})</button>
+      <button class="skyf ${uOortjie === 'terug' ? 'aan' : ''}" data-o="terug">Terugbesorg</button></div>
+    ${lys.length ? lys.map(leenKaart).join('') : `<div class="kaart leeg-lys">${uOortjie === 'laat' ? 'Niks is laat nie. 👍' : 'Niks hier nie.'}</div>`}
+    <button class="fab" id="nuweLeen" aria-label="Nuwe uitleen">${IK.plus}</button>`;
+  $$('[data-o]').forEach(b => b.onclick = () => { uOortjie = b.dataset.o; tekenUitleen(); });
+  $$('[data-terug]').forEach(b => b.onclick = () => terugbesorg(b.dataset.terug));
+  $$('[data-item]').forEach(b => b.onclick = () => wysItemDetail(b.dataset.item));
+  $('#nuweLeen').onclick = () => kiesItem({ titel: 'Wat word uitgeleen?', by: it => openAksie('leen', it.barcode, werkLigging()) });
+}
+function leenKaart(l) {
+  const it = IX.item.get(l.barcode);
+  const laat = isLaat(l);
+  return `<div class="kaart">
+    <div class="ry tussen"><div style="min-width:0"><b data-item="${esc(l.barcode)}" style="cursor:pointer">${esc(it?.naam || l.barcode)}</b>
+      <div class="sag klein">${esc(ligNaam(l.vanLigging))} → ${esc(ligNaam(l.naLigging))}</div></div>
+      <div style="text-align:right"><div class="totaal" style="font-size:1.5rem">${fmtN(l.status === 'oop' ? uitstaande(l) : l.hoeveelheid)}</div>
+      ${l.status === 'oop' ? `<span class="etiket ${laat ? 'rooi' : 'amber'}">${laat ? 'Laat' : 'Uitstaande'}</span>` : '<span class="etiket groen">Terug</span>'}</div></div>
+    <ul class="voorraadlys">
+      <li><span class="sag">Uitgeteken deur</span><span>${esc(l.persoon)}</span></li>
+      ${l.epos || l.selfoon ? `<li><span class="sag">Kontak</span><span class="klein">${l.epos ? `<a href="mailto:${esc(l.epos)}">${esc(l.epos)}</a>` : ''}${l.epos && l.selfoon ? ' · ' : ''}${l.selfoon ? `<a href="tel:${esc(l.selfoon)}">${esc(l.selfoon)}</a>` : ''}</span></li>` : ''}
+      <li><span class="sag">Uit op</span><span>${fmtDT(l.uitDatum)}</span></li>
+      <li><span class="sag">${l.status === 'oop' ? 'Terug teen' : 'Terug op'}</span><span ${laat ? 'style="color:var(--fout);font-weight:700"' : ''}>${l.status === 'oop' ? fmtD(l.terugDatum) : fmtDT(l.terugOp)}</span></li>
+      ${l.terugGegee > 0 && l.status === 'oop' ? `<li><span class="sag">Reeds terug</span><span>${fmtN(l.terugGegee)} van ${fmtN(l.hoeveelheid)}</span></li>` : ''}
+      ${l.nota ? `<li><span class="sag">Nota</span><span>${esc(l.nota)}</span></li>` : ''}
+      <li><span class="sag">Uitgereik deur</span><span>${esc(l.deur)}</span></li></ul>
+    ${l.status === 'oop' ? `<button class="kn hoof vol" style="margin-top:12px" data-terug="${esc(l.id)}">Merk as terugbesorg</button>` : ''}
+  </div>`;
+}
+function terugbesorg(id) {
+  const l = S.uitlenings.find(x => x.id === id);
+  if (!l) return;
+  const it = IX.item.get(l.barcode);
+  const u = uitstaande(l);
+  maakBlad('Terugbesorg', `<p style="margin-top:0"><b>${esc(it?.naam || l.barcode)}</b> van ${esc(l.persoon)} gaan terug na <b>${esc(ligNaam(l.vanLigging))}</b>.</p>
+    <form class="stapel" id="tf"><label class="veld"><span>Hoeveel kom terug? (uitstaande: ${fmtN(u)})</span>
+    <div class="stapper"><button type="button" data-d="-1">−</button><input name="hv" type="number" inputmode="decimal" step="any" min="0" max="${u}" value="${u}" data-fokus="nee"><button type="button" data-d="1">+</button></div></label>
+    <p class="sag klein" style="margin:0">Is iets stukkend terug? Meld dit daarna as gebreek by ${esc(ligNaam(l.vanLigging))}.</p>
+    <button class="kn hoof vol">Bevestig terugbesorging</button></form>`, blad => {
+    const f = $('#tf', blad.lyf);
+    $$('.stapper button', f).forEach(k => k.onclick = () => { const n = getal(f.hv.value) || 0; f.hv.value = Math.min(u, Math.max(0, n + Number(k.dataset.d))); });
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const n = getal(f.hv.value);
+      if (!(n > 0 && n <= u)) return wysFout(f, new Error(`Gee 'n hoeveelheid tussen 1 en ${fmtN(u)}.`));
+      await metKnop($('button.vol', f), async () => {
+        try {
+          await skryf('leen_terug', { id, hoeveelheid: n });
+          plaaslikeLog('TERUG', l.barcode, l.vanLigging, n, l.persoon);
+          toast(n >= u ? 'Terugbesorg' : `${fmtN(n)} terug, ${fmtN(u - n)} nog uitstaande`, 'goed');
+          blad.sluit(); herteken();
+        } catch (err) { wysFout(f, err); }
+      });
+    };
+  });
+}
+
+/* ---------------------------------------------------------------------
+   ETIKETTE — Code 128 + eie PDF-skrywer (werk sonder ekstra biblioteke)
+--------------------------------------------------------------------- */
+const C128 = '212222,222122,222221,121223,121322,131222,122213,122312,132212,221213,221312,231212,112232,122132,122231,113222,123122,123221,223211,221132,221231,213212,223112,312131,311222,321122,321221,312212,322112,322211,212123,212321,232121,111323,131123,131321,112313,132113,132311,211313,231113,231311,112133,112331,132131,113123,113321,133121,313121,211331,231131,213113,213311,213131,311123,311321,331121,312113,312311,332111,314111,221411,431111,111224,111422,121124,121421,141122,141221,112214,112412,122114,122411,142112,142211,241211,221114,413111,241112,134111,111242,121142,121241,114212,124112,124211,411212,421112,421211,212141,214121,412121,111143,111341,131141,114113,114311,411113,411311,113141,114131,311141,411131,211412,211214,211232,2331112'.split(',');
+
+/** Gee 'n lys stafwydtes (stafie, spasie, stafie, …) in modules terug. Code 128 stel B. */
+function code128(teks) {
+  const waardes = [104];
+  for (const ch of String(teks)) {
+    const c = ch.charCodeAt(0);
+    if (c < 32 || c > 126) throw new Error(`Die karakter "${ch}" kan nie in 'n strepieskode nie.`);
+    waardes.push(c - 32);
+  }
+  let som = 104;
+  for (let i = 1; i < waardes.length; i++) som += waardes[i] * i;
+  waardes.push(som % 103, 106);
+  return waardes.flatMap(v => C128[v].split('').map(Number));
+}
+
+function strepieSvg(teks) {
+  const w = code128(teks);
+  const tot = w.reduce((a, b) => a + b, 0) + 20;
+  let x = 10, d = '';
+  w.forEach((b, i) => { if (i % 2 === 0) d += `M${x} 0h${b}v50h-${b}z`; x += b; });
+  return `<svg viewBox="0 0 ${tot} 50" preserveAspectRatio="none"><path d="${d}" fill="#000"/></svg>`;
+}
+
+/* Helvetica-wydtes (1/1000 em) vir karakters 32–255 in WinAnsi */
+const HW = {
+  F1: [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,761,556,761,222,556,333,1000,556,556,333,1000,667,333,1000,761,611,761,761,222,222,333,333,350,556,1000,333,1000,500,333,944,761,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500],
+  F2: [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,761,556,761,278,556,500,1000,556,556,333,1000,667,333,1000,761,611,761,761,278,278,500,500,350,556,1000,333,1000,556,333,944,761,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556]
+};
+const WIN = { 0x20AC: 128, 0x201A: 130, 0x2026: 133, 0x2018: 145, 0x2019: 146, 0x201C: 147, 0x201D: 148, 0x2022: 149, 0x2013: 150, 0x2014: 151 };
+const winKode = ch => { const c = ch.codePointAt(0); if (c >= 32 && c <= 126) return c; if (c >= 160 && c <= 255) return c; return WIN[c] || 63; };
+
+class KleinPdf {
+  constructor(bw = 210, bh = 297) { this.bw = bw; this.bh = bh; this.blaaie = []; this.nuweBlad(); }
+  nuweBlad() { this.ops = []; this.blaaie.push(this.ops); }
+  pt(mm) { return (mm * 72 / 25.4).toFixed(3); }
+  breedte(t, grootte, vet) { const w = HW[vet ? 'F2' : 'F1']; let s = 0; for (const ch of t) s += w[winKode(ch) - 32] || 556; return s * grootte / 1000 * 25.4 / 72; }
+  pas(t, maks, grootte, vet) {
+    if (this.breedte(t, grootte, vet) <= maks) return t;
+    while (t.length > 1 && this.breedte(t + '…', grootte, vet) > maks) t = t.slice(0, -1);
+    return t.trimEnd() + '…';
+  }
+  vou(t, maks, grootte, vet, lyne) {
+    const woorde = t.split(/\s+/); const uit = []; let ry = '';
+    for (const w of woorde) {
+      const toets = ry ? ry + ' ' + w : w;
+      if (this.breedte(toets, grootte, vet) <= maks || !ry) ry = toets; else { uit.push(ry); ry = w; }
+    }
+    if (ry) uit.push(ry);
+    if (uit.length > lyne) { uit.length = lyne; uit[lyne - 1] = this.pas(uit[lyne - 1] + ' …', maks, grootte, vet); }
+    return uit.map(r => this.pas(r, maks, grootte, vet));
+  }
+  reghoek(x, y, w, h) { this.ops.push(`${this.pt(x)} ${this.pt(this.bh - y - h)} ${this.pt(w)} ${this.pt(h)} re f`); }
+  lyn(x1, y1, x2, y2, grys = .75) { this.ops.push(`q ${grys} G 0.25 w [2 2] 0 d ${this.pt(x1)} ${this.pt(this.bh - y1)} m ${this.pt(x2)} ${this.pt(this.bh - y2)} l S Q`); }
+  teks(t, x, y, grootte, { vet = false, belyn = 'links', grys = 0 } = {}) {
+    let bytes = '';
+    for (const ch of t) {
+      const k = winKode(ch);
+      if (ch === '(' || ch === ')' || ch === '\\') bytes += '\\' + ch;
+      else if (k < 32 || k > 126) bytes += '\\' + k.toString(8).padStart(3, '0');
+      else bytes += String.fromCharCode(k);
+    }
+    const w = this.breedte(t, grootte, vet);
+    const x0 = belyn === 'middel' ? x - w / 2 : belyn === 'regs' ? x - w : x;
+    this.ops.push(`BT ${grys} g /${vet ? 'F2' : 'F1'} ${grootte} Tf ${this.pt(x0)} ${this.pt(this.bh - y)} Td (${bytes}) Tj ET 0 g`);
+  }
+  bou() {
+    const obj = [];
+    const n = this.blaaie.length;
+    obj[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+    obj[2] = `<< /Type /Pages /Count ${n} /Kids [${this.blaaie.map((_, i) => `${5 + i * 2} 0 R`).join(' ')}] >>`;
+    obj[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+    obj[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+    this.blaaie.forEach((ops, i) => {
+      const inhoud = ops.join('\n');
+      obj[5 + i * 2] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.pt(this.bw)} ${this.pt(this.bh)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${6 + i * 2} 0 R >>`;
+      obj[6 + i * 2] = `<< /Length ${inhoud.length} >>\nstream\n${inhoud}\nendstream`;
+    });
+    let uit = '%PDF-1.4\n';
+    const posisies = [];
+    for (let i = 1; i < obj.length; i++) { posisies[i] = uit.length; uit += `${i} 0 obj\n${obj[i]}\nendobj\n`; }
+    const xref = uit.length;
+    uit += `xref\n0 ${obj.length}\n0000000000 65535 f \n` + posisies.slice(1).map(p => String(p).padStart(10, '0') + ' 00000 n \n').join('');
+    uit += `trailer\n<< /Size ${obj.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    const bytes = new Uint8Array(uit.length);
+    for (let i = 0; i < uit.length; i++) bytes[i] = uit.charCodeAt(i) & 255;
+    return bytes;
+  }
+}
+
+const UITLEGTE = {
+  '3x8': { naam: '24 per blad · 70 × 37 mm', kol: 3, ry: 8, w: 70, h: 37, x: 0, y: 0.5, gx: 0, gy: 0 },
+  '3x7': { naam: '21 per blad · 70 × 42,3 mm', kol: 3, ry: 7, w: 70, h: 42.3, x: 0, y: 0.4, gx: 0, gy: 0 },
+  '2x7': { naam: '14 per blad · 99,1 × 38,1 mm', kol: 2, ry: 7, w: 99.1, h: 38.1, x: 4.65, y: 15.15, gx: 2.5, gy: 0 },
+  '4x10': { naam: '40 per blad · 52,5 × 29,7 mm', kol: 4, ry: 10, w: 52.5, h: 29.7, x: 0, y: 0, gx: 0, gy: 0 },
+  'papier': { naam: 'Gewone A4-papier · 30 met snylyne', kol: 3, ry: 10, w: 63, h: 27, x: 10.5, y: 13.5, gx: 0, gy: 0, sny: true }
+};
+
+function etiketInstellings() {
+  return Object.assign({ lys: [], uitleg: '3x8', begin: 1, skool: true, dx: 0, dy: 0 }, stoor.kry(K.etiket, {}));
+}
+function stelEtiket(e) { stoor.stel(K.etiket, e); }
+function voegEtiketBy(barcode, aantal) {
+  const e = etiketInstellings();
+  const b = e.lys.find(x => x.bc === barcode);
+  if (b) b.n += aantal; else e.lys.push({ bc: barcode, n: aantal });
+  stelEtiket(e);
+}
+
+function maakEtiketPdf(e) {
+  const U = UITLEGTE[e.uitleg] || UITLEGTE['3x8'];
+  const perBlad = U.kol * U.ry;
+  const reeks = [];
+  e.lys.forEach(x => { const it = IX.item.get(x.bc); if (it) for (let i = 0; i < x.n; i++) reeks.push(it); });
+  if (!reeks.length) throw new Error('Voeg eers items by.');
+  const pdf = new KleinPdf();
+  const skool = e.skool ? (S.instellings.skool || '') : '';
+  let plek = Math.max(0, Math.min(perBlad - 1, (Number(e.begin) || 1) - 1));
+  const snylyne = () => {
+    if (!U.sny) return;
+    for (let c = 0; c <= U.kol; c++) { const x = U.x + c * U.w + e.dx; pdf.lyn(x, U.y + e.dy - 4, x, U.y + U.ry * U.h + e.dy + 4); }
+    for (let r = 0; r <= U.ry; r++) { const y = U.y + r * U.h + e.dy; pdf.lyn(U.x + e.dx - 4, y, U.x + U.kol * U.w + e.dx + 4, y); }
+  };
+  snylyne();
+  reeks.forEach(item => {
+    if (plek >= perBlad) { pdf.nuweBlad(); snylyne(); plek = 0; }
+    const c = plek % U.kol, r = Math.floor(plek / U.kol);
+    const x = U.x + c * (U.w + U.gx) + e.dx, y = U.y + r * (U.h + U.gy) + e.dy;
+    teken1Etiket(pdf, item, x, y, U.w, U.h, skool);
+    plek++;
+  });
+  return pdf.bou();
+}
+
+function teken1Etiket(pdf, item, x, y, w, h, skool) {
+  const pad = Math.min(3, w * .05);
+  const binne = w - 2 * pad;
+  let yy = y + pad;
+  const klein = h < 32;
+  if (skool) { yy += 2; pdf.teks(pdf.pas(skool, binne, 5.5), x + w / 2, yy, 5.5, { belyn: 'middel', grys: .4 }); yy += .8; }
+  const ng = klein ? 7.5 : 9;
+  const lyne = pdf.vou(item.naam, binne, ng, true, h >= 40 ? 2 : 1);
+  lyne.forEach(l => { yy += ng * .3528 + .6; pdf.teks(l, x + w / 2, yy, ng, { vet: true, belyn: 'middel' }); });
+  yy += 1.5;
+  const kodeGrootte = klein ? 7 : 8;
+  const onder = y + h - pad - kodeGrootte * .3528 - .8;
+  const stafH = Math.max(6, Math.min(onder - yy, 20));
+  const wydtes = code128(item.barcode);
+  const modules = wydtes.reduce((a, b) => a + b, 0);
+  const mod = Math.min(.5, binne / (modules + 20));
+  let bx = x + (w - modules * mod) / 2;
+  wydtes.forEach((b, i) => { if (i % 2 === 0) pdf.reghoek(bx, yy, b * mod, stafH); bx += b * mod; });
+  pdf.teks(item.barcode, x + w / 2, yy + stafH + kodeGrootte * .3528 + .6, kodeGrootte, { belyn: 'middel' });
+}
+
+function tekenEtikette() {
+  const e = etiketInstellings();
+  e.lys = e.lys.filter(x => IX.item.get(x.bc)?.aktief);
+  stelEtiket(e);
+  const U = UITLEGTE[e.uitleg] || UITLEGTE['3x8'];
+  const totaal = e.lys.reduce((s, x) => s + x.n, 0);
+  const bladsye = totaal ? Math.ceil((totaal + (Number(e.begin) || 1) - 1) / (U.kol * U.ry)) : 0;
+  const eerste = e.lys[0] && IX.item.get(e.lys[0].bc);
+  $('#inhoud').innerHTML = `
+    <div class="kaart stapel">
+      <div class="ry tussen"><h2 style="font-size:1.05rem">Strepieskode-etikette</h2><span class="etiket">${totaal} etiket${totaal === 1 ? '' : 'te'} · ${bladsye} blad${bladsye === 1 ? '' : 'e'}</span></div>
+      ${eerste ? `<div class="voorskou">${e.skool && S.instellings.skool ? `<div class="s">${esc(S.instellings.skool)}</div>` : ''}<div class="n">${esc(eerste.naam)}</div>${strepieSvg(eerste.barcode)}<div class="k">${esc(eerste.barcode)}</div></div>` : '<p class="sag" style="margin:0">Kies watter items etikette moet kry.</p>'}
+      <div class="twee"><button class="kn" id="eVoeg">${IK.plus}<span>Voeg items by</span></button><button class="kn" id="eAlles">Alle items</button></div>
+    </div>
+    ${e.lys.length ? `<div class="lys" style="margin-bottom:12px">${e.lys.map((x, i) => { const it = IX.item.get(x.bc); return `<div class="el" style="cursor:default"><div class="hoof-teks"><b>${esc(it.naam)}</b><span class="sag klein mono">${esc(it.barcode)}</span></div>
+      <div class="tel-ry"><button class="kn klein" data-min="${i}">−</button><input class="inv" data-n="${i}" type="number" min="0" value="${x.n}" style="min-height:36px;padding:4px"><button class="kn klein" data-plus="${i}">+</button></div></div>`; }).join('')}</div>
+      <button class="kn vol klein" id="eLeeg" style="margin-bottom:12px">Maak lys skoon</button>` : ''}
+    <div class="kaart stapel">
+      <label class="veld"><span>Plakkervel</span><select class="inv" id="eUit">${Object.entries(UITLEGTE).map(([k, u]) => `<option value="${k}" ${k === e.uitleg ? 'selected' : ''}>${u.naam}</option>`).join('')}</select></label>
+      <label class="veld"><span>Begin by etiket nr. (as die vel al deels gebruik is)</span><input class="inv" id="eBegin" type="number" min="1" max="${U.kol * U.ry}" value="${e.begin}"></label>
+      <label class="skakel"><input type="checkbox" id="eSkool" ${e.skool ? 'checked' : ''}><span>Druk skoolnaam bo-aan elke etiket</span></label>
+      <details class="gevorderd"><summary>Drukker-aanpassing</summary><div class="twee" style="margin-top:8px">
+        <label class="veld"><span>Skuif regs (mm)</span><input class="inv" id="eDx" type="number" step="0.5" value="${e.dx}"></label>
+        <label class="veld"><span>Skuif af (mm)</span><input class="inv" id="eDy" type="number" step="0.5" value="${e.dy}"></label></div>
+        <p class="sag klein">Druk eers een bladsy op gewone papier en hou dit teen die plakkervel om te kyk of dit pas. Druk op 100% / "Werklike grootte", nie "Pas op bladsy" nie.</p></details>
+      <button class="kn amber vol" id="ePdf" ${totaal ? '' : 'disabled'}>${IK.dok}<span>Maak PDF</span></button>
+    </div>`;
+  const her = () => tekenEtikette();
+  $('#eVoeg').onclick = () => kiesItem({ titel: 'Voeg etikette by', veelvoudig: true, by: it => { voegEtiketBy(it.barcode, 1); toast(`${it.naam} bygevoeg`); } }).toe = her;
+  $('#eAlles').onclick = () => { const x = etiketInstellings(); S.items.filter(i => i.aktief).forEach(i => { if (!x.lys.find(y => y.bc === i.barcode)) x.lys.push({ bc: i.barcode, n: 1 }); }); stelEtiket(x); her(); };
+  if ($('#eLeeg')) $('#eLeeg').onclick = () => { const x = etiketInstellings(); x.lys = []; stelEtiket(x); her(); };
+  $$('[data-min]').forEach(b => b.onclick = () => { const x = etiketInstellings(); const i = +b.dataset.min; x.lys[i].n--; if (x.lys[i].n <= 0) x.lys.splice(i, 1); stelEtiket(x); her(); });
+  $$('[data-plus]').forEach(b => b.onclick = () => { const x = etiketInstellings(); x.lys[+b.dataset.plus].n++; stelEtiket(x); her(); });
+  $$('[data-n]').forEach(inp => inp.onchange = () => { const x = etiketInstellings(); const i = +inp.dataset.n; const n = Math.max(0, Math.floor(getal(inp.value) || 0)); if (n) x.lys[i].n = n; else x.lys.splice(i, 1); stelEtiket(x); her(); });
+  const stel = (k, v) => { const x = etiketInstellings(); x[k] = v; stelEtiket(x); her(); };
+  $('#eUit').onchange = ev => stel('uitleg', ev.target.value);
+  $('#eBegin').onchange = ev => stel('begin', Math.max(1, Math.floor(getal(ev.target.value) || 1)));
+  $('#eSkool').onchange = ev => stel('skool', ev.target.checked);
+  $('#eDx').onchange = ev => stel('dx', getal(ev.target.value) || 0);
+  $('#eDy').onchange = ev => stel('dy', getal(ev.target.value) || 0);
+  $('#ePdf').onclick = () => {
+    try {
+      const bytes = maakEtiketPdf(etiketInstellings());
+      const naam = `etikette-${isoDag(new Date())}.pdf`;
+      laaiAf(new Blob([bytes], { type: 'application/pdf' }), naam);
+    } catch (err) { toast(err.message, 'fout'); }
+  };
+}
+
+async function laaiAf(blob, naam) {
+  const lêer = typeof File === 'function' ? new File([blob], naam, { type: blob.type }) : null;
+  const url = URL.createObjectURL(blob);
+  maakBlad('PDF is gereed', `<p style="margin-top:0">Jou etikette is gereed. Druk op <b>100% / werklike grootte</b>.</p>
+    <div class="stapel"><a class="kn hoof vol" href="${url}" download="${esc(naam)}">${IK.dok}<span>Laai PDF af</span></a>
+    <a class="kn vol" href="${url}" target="_blank" rel="noopener">Maak oop in nuwe oortjie</a>
+    ${lêer && navigator.canShare && navigator.canShare({ files: [lêer] }) ? '<button class="kn vol" id="deel">Deel / stuur na drukker…</button>' : ''}</div>`, b => {
+    b.toe = () => setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if ($('#deel', b.lyf)) $('#deel', b.lyf).onclick = () => navigator.share({ files: [lêer], title: naam }).catch(() => { });
+  });
+}
+
+/* ---------------------------------------------------------------------
+   MEER
+--------------------------------------------------------------------- */
+function tekenMeer() {
+  const oopBreek = S.gebreek.filter(g => g.status === 'aangemeld').length;
+  const teëls = [
+    ['gebreek', IK.gebreek, 'Gebreek', oopBreek ? `${oopBreek} wag vir hantering` : 'Niks oop nie'],
+    ['geskiedenis', IK.klok, 'Geskiedenis', 'Alle bewegings'],
+    ...(isAdmin() ? [
+      ['liggings', IK.plek, 'Liggings', `${aktieweLiggings().length} labs en klasse`],
+      ['gebruikers', IK.mense, 'Gebruikers', `${S.gebruikers.filter(g => g.aktief).length} aktief`],
+      ['instellings', IK.rat, 'Instellings', 'Skool, e-pos']
+    ] : [['myliggings', IK.plek, 'My liggings', myLiggings().map(l => l.naam).join(', ') || 'Geen']]),
+    ['wagwoord', IK.sleutel, 'Wagwoord', 'Verander jou wagwoord'],
+    ['herlaai', IK.voorraad, 'Herlaai data', S.gelaai ? 'Laas ' + fmtDT(S.gelaai) : ''],
+    ['af', IK.uit, 'Meld af', S.gebruiker.epos]
+  ];
+  $('#inhoud').innerHTML = `<div class="teëls">${teëls.map(([k, ik, t, s]) => `<button class="teël" data-t="${k}">${ik}<b>${esc(t)}</b><small>${esc(s)}</small></button>`).join('')}</div>
+    <p class="sag klein" style="text-align:center;margin-top:24px">Data word in die Google Sheet op die admin se Drive gestoor.</p>`;
+  $$('[data-t]').forEach(b => b.onclick = () => ({
+    gebreek: wysGebreek, geskiedenis: wysGeskiedenis, liggings: wysLiggings, gebruikers: wysGebruikers, instellings: wysInstellings,
+    myliggings: () => { S.blad = 'voorraad'; teken(); },
+    wagwoord: () => wysVeranderWagwoord(false), herlaai: () => laaiAlles(false),
+    af: async () => { if (await bevestig('Meld af op hierdie foon?', 'Meld af')) meldAf(); }
+  })[b.dataset.t]());
+}
+
+function wysGebreek() {
+  maakBlad('Gebreek', '', blad => {
+    blad.herlaai = () => {
+      const oop = S.gebreek.filter(g => g.status === 'aangemeld').reverse();
+      const ou = S.gebreek.filter(g => g.status !== 'aangemeld').reverse().slice(0, 40);
+      const kaart = g => { const it = IX.item.get(g.barcode); return `<div class="kaart"><div class="ry tussen"><div><b>${esc(it?.naam || g.barcode)}</b><div class="sag klein">${esc(ligNaam(g.liggingId))} · ${fmtDT(g.datum)} · ${esc(g.deur)}</div></div><div class="totaal" style="font-size:1.4rem;color:var(--fout)">${fmtN(g.hoeveelheid)}</div></div>
+        ${g.rede ? `<p style="margin:8px 0 0">${esc(g.rede)}</p>` : ''}
+        ${g.status === 'aangemeld' ? (isAdmin() ? `<div class="twee" style="margin-top:12px"><button class="kn" data-h="${esc(g.id)}">Herstel na voorraad</button><button class="kn gevaar" data-s="${esc(g.id)}">Skryf af</button></div>` : '<p class="sag klein" style="margin:8px 0 0">Wag vir die admin.</p>')
+          : `<p style="margin:8px 0 0"><span class="etiket ${g.status === 'herstel' ? 'groen' : 'grys'}">${esc(g.status)}</span> <span class="sag klein">${fmtD(g.opgelosOp)} · ${esc(g.opgelosDeur)}</span></p>`}</div>`; };
+      blad.lyf.innerHTML = `<button class="kn vol" id="meld" style="margin-bottom:12px">${IK.gebreek}<span>Meld iets as gebreek</span></button>
+        <div class="afdeling">Wag vir hantering (${oop.length})</div>${oop.length ? oop.map(kaart).join('') : '<div class="kaart plat sag">Niks nie.</div>'}
+        ${ou.length ? `<div class="afdeling">Hanteer</div>${ou.map(kaart).join('')}` : ''}`;
+      $('#meld', blad.lyf).onclick = () => kiesItem({ titel: 'Wat is gebreek?', by: it => openAksie('gebreek', it.barcode, werkLigging()) });
+      const los = async (id, aksie) => {
+        const g = S.gebreek.find(x => x.id === id);
+        const vraag = aksie === 'herstel' ? `Sit ${fmtN(g.hoeveelheid)} terug in die voorraad by ${ligNaam(g.liggingId)}?` : `Skryf ${fmtN(g.hoeveelheid)} permanent af?`;
+        if (!await bevestig(vraag, aksie === 'herstel' ? 'Herstel' : 'Skryf af', aksie !== 'herstel')) return;
+        try { await skryf('gebreek_los', { id, aksie }); plaaslikeLog(aksie === 'herstel' ? 'HERSTEL' : 'AFSKRYF', g.barcode, g.liggingId, g.hoeveelheid, ''); toast('Gestoor', 'goed'); herteken(); } catch (e) { toast(e.message, 'fout'); }
+      };
+      $$('[data-h]', blad.lyf).forEach(b => b.onclick = () => los(b.dataset.h, 'herstel'));
+      $$('[data-s]', blad.lyf).forEach(b => b.onclick = () => los(b.dataset.s, 'afskryf'));
+    };
+    blad.herlaai();
+  });
+}
+
+function wysGeskiedenis() {
+  maakBlad('Geskiedenis', `<div class="soek">${IK.soek}<input class="inv" id="gq" placeholder="Filtreer op item, persoon of aksie"></div><div id="gl"></div>`, blad => {
+    const teken = () => {
+      const q = $('#gq', blad.lyf).value.trim().toLowerCase();
+      const lys = S.log.slice().reverse().filter(l => !q || [IX.item.get(l.barcode)?.naam, l.barcode, l.gebruiker, l.aksie, l.nota, ligNaam(l.liggingId)].join(' ').toLowerCase().includes(q)).slice(0, 150);
+      $('#gl', blad.lyf).innerHTML = lys.length ? `<div class="lys">${lys.map(logRy).join('')}</div>` : '<div class="leeg-lys">Niks nie.</div>';
+      $$('#gl [data-bc]', blad.lyf).forEach(el => el.onclick = () => wysItemDetail(el.dataset.bc));
+    };
+    $('#gq', blad.lyf).oninput = teken;
+    blad.herlaai = teken;
+    teken();
+  });
+}
+
+function wysLiggings() {
+  maakBlad('Liggings', '', blad => {
+    blad.herlaai = () => {
+      const lys = aktieweLiggings();
+      blad.lyf.innerHTML = `<button class="kn hoof vol" id="nuL" style="margin-bottom:12px">${IK.plus}<span>Voeg lab / klas by</span></button>
+        ${lys.length ? `<div class="lys">${lys.map(l => { const n = S.voorraad.filter(v => v.liggingId === l.id && v.hoeveelheid > 0).length; const wie = S.gebruikers.filter(g => g.aktief && g.liggings.includes(l.id)).map(g => g.naam).join(', '); return `<button class="el" data-l="${esc(l.id)}"><div class="hoof-teks"><b>${esc(l.naam)}</b><span class="sag klein">${n} item${n === 1 ? '' : 's'}${wie ? ' · ' + esc(wie) : ''}</span></div><span class="etiket">${esc(l.tipe)}</span></button>`; }).join('')}</div>` : '<div class="kaart leeg-lys">Nog geen liggings nie.</div>'}`;
+      $('#nuL', blad.lyf).onclick = () => liggingVorm();
+      $$('[data-l]', blad.lyf).forEach(b => b.onclick = () => liggingVorm(IX.lig.get(b.dataset.l)));
+    };
+    blad.herlaai();
+  });
+}
+function liggingVorm(l) {
+  maakBlad(l ? 'Wysig ligging' : 'Nuwe ligging', `<form class="stapel" id="lf">
+    <label class="veld"><span>Naam</span><input class="inv" name="naam" required value="${esc(l?.naam || '')}" placeholder="bv. Chemie-lab 1, Graad 10 Wetenskap"></label>
+    <label class="veld"><span>Tipe</span><select class="inv" name="tipe">${['Lab', 'Klas', 'Stoor'].map(t => `<option ${l?.tipe === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+    <button class="kn hoof vol">Stoor</button>${l ? '<button type="button" class="kn gevaar vol" id="verw">Verwyder ligging</button>' : ''}</form>`, blad => {
+    const f = $('#lf', blad.lyf);
+    f.onsubmit = async e => {
+      e.preventDefault();
+      await metKnop($('button.hoof', f), async () => {
+        try { await skryf('ligging_stoor', { id: l?.id, naam: f.naam.value, tipe: f.tipe.value }); toast('Gestoor', 'goed'); blad.sluit(); herteken(); }
+        catch (err) { wysFout(f, err); }
+      });
+    };
+    if ($('#verw', f)) $('#verw', f).onclick = async () => {
+      if (!await bevestig(`Verwyder ${l.naam}?`, 'Verwyder', true)) return;
+      try { await skryf('ligging_verwyder', { id: l.id }); toast('Verwyder', 'goed'); blad.sluit(); herteken(); }
+      catch (err) { wysFout(f, err); }
+    };
+  });
+}
+
+function wysGebruikers() {
+  maakBlad('Gebruikers', '', blad => {
+    blad.herlaai = () => {
+      const lys = S.gebruikers.slice().sort((a, b) => (b.aktief - a.aktief) || a.naam.localeCompare(b.naam));
+      blad.lyf.innerHTML = `<button class="kn hoof vol" id="nuG" style="margin-bottom:12px">${IK.plus}<span>Voeg onderwyser by</span></button>
+        <div class="lys">${lys.map(g => `<button class="el ${g.aktief ? '' : 'dof'}" data-g="${esc(g.id)}"><div class="hoof-teks"><b>${esc(g.naam)}</b><span class="sag klein">${esc(g.epos)}<br>${g.rol === 'admin' ? 'Toegang tot alles' : esc(g.liggings.map(ligNaam).join(', ') || 'Geen liggings')}</span></div>
+          <span class="etiket ${g.rol === 'admin' ? 'amber' : ''}">${g.rol === 'admin' ? 'Admin' : 'Onderwyser'}</span>${g.aktief ? '' : '<span class="etiket grys">Af</span>'}</button>`).join('')}</div>`;
+      $('#nuG', blad.lyf).onclick = () => gebruikerVorm();
+      $$('[data-g]', blad.lyf).forEach(b => b.onclick = () => gebruikerVorm(S.gebruikers.find(g => g.id === b.dataset.g)));
+    };
+    blad.herlaai();
+  });
+}
+function gebruikerVorm(g) {
+  const ek = g && g.id === S.gebruiker.id;
+  maakBlad(g ? 'Wysig gebruiker' : 'Nuwe gebruiker', `<form class="stapel" id="gf">
+    <label class="veld"><span>Naam</span><input class="inv" name="naam" required value="${esc(g?.naam || '')}"></label>
+    <label class="veld"><span>E-pos (gebruikersnaam)</span><input class="inv" name="epos" type="email" required value="${esc(g?.epos || '')}"></label>
+    <label class="veld"><span>Rol</span><select class="inv" name="rol" ${ek ? 'disabled' : ''}><option value="onderwyser">Onderwyser — net eie klas/lab</option><option value="admin" ${g?.rol === 'admin' ? 'selected' : ''}>Admin — toegang tot alles</option></select></label>
+    <div id="ligKeus"><div class="sag klein" style="font-weight:600;margin:0 0 6px 2px">Klasse / labs wat hy of sy hanteer</div>
+      <div class="merk">${aktieweLiggings().map(l => `<label><input type="checkbox" name="lig" value="${esc(l.id)}" ${g?.liggings.includes(l.id) ? 'checked' : ''}>${esc(l.naam)}</label>`).join('') || '<span class="sag">Voeg eers liggings by.</span>'}</div></div>
+    ${g && !ek ? `<label class="skakel"><input type="checkbox" name="aktief" ${g.aktief ? 'checked' : ''}><span>Rekening is aktief</span></label>` : ''}
+    <button class="kn hoof vol">${g ? 'Stoor' : 'Skep rekening'}</button>
+    ${g ? '<button type="button" class="kn vol" id="herst">Herstel wagwoord</button>' : '<p class="sag klein" style="margin:0">\'n Tydelike wagwoord word geskep en per e-pos gestuur.</p>'}</form>`, blad => {
+    const f = $('#gf', blad.lyf);
+    const wys = () => $('#ligKeus', f).classList.toggle('verberg', f.rol.value === 'admin');
+    f.rol.onchange = wys; wys();
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const data = { id: g?.id, naam: f.naam.value, epos: f.epos.value, rol: ek ? 'admin' : f.rol.value, liggings: $$('input[name=lig]:checked', f).map(i => i.value), aktief: f.aktief ? f.aktief.checked : true };
+      await metKnop($('button.hoof', f), async () => {
+        try {
+          const r = await skryf('gebruiker_stoor', data);
+          blad.sluit(); herteken();
+          if (r.tydelikeWagwoord) wysTydelik(r); else toast('Gestoor', 'goed');
+        } catch (err) { wysFout(f, err); }
+      });
+    };
+    if ($('#herst', f)) $('#herst', f).onclick = async () => {
+      if (!await bevestig(`Skep 'n nuwe tydelike wagwoord vir ${g.naam}?`, 'Herstel')) return;
+      try { const r = await skryf('gebruiker_herstel', { id: g.id }); blad.sluit(); wysTydelik(r); } catch (err) { wysFout(f, err); }
+    };
+  });
+}
+function wysTydelik(r) {
+  maakBlad('Tydelike wagwoord', `<p style="margin-top:0">${esc(r.gebruiker.naam)} kan nou aanmeld met:</p>
+    <div class="kaart plat"><div class="sag klein">E-pos</div><b>${esc(r.gebruiker.epos)}</b><div class="sag klein" style="margin-top:8px">Tydelike wagwoord</div><b class="mono" style="font-size:1.4rem">${esc(r.tydelikeWagwoord)}</b></div>
+    <p>${r.eposGestuur ? '✅ Dit is ook per e-pos gestuur.' : '⚠️ Die e-pos kon nie gestuur word nie — gee die wagwoord self aan.'}</p>
+    <p class="sag klein">Die stelsel vra vir \'n nuwe wagwoord by die eerste aanmelding.</p>
+    <button class="kn vol" id="kop">Kopieer wagwoord</button>`, b => {
+    $('#kop', b.lyf).onclick = () => navigator.clipboard?.writeText(r.tydelikeWagwoord).then(() => toast('Gekopieer'), () => { });
+  });
+}
+
+function wysInstellings() {
+  maakBlad('Instellings', `<form class="stapel" id="if">
+    <label class="veld"><span>Skool se naam</span><input class="inv" name="skool" value="${esc(S.instellings.skool)}"></label>
+    <label class="skakel"><input type="checkbox" name="eposAan" ${S.instellings.eposAan ? 'checked' : ''}><span>Stuur e-posse (kwitansies, gebreek-verslae, herinneringe)</span></label>
+    ${S.instellings.eposKwota !== null && S.instellings.eposKwota !== undefined ? `<p class="sag klein" style="margin:0">E-posse oor vandag: <b>${S.instellings.eposKwota}</b> (Google laat ±100 per dag toe op 'n gewone Gmail-rekening).</p>` : ''}
+    <button class="kn hoof vol">Stoor</button>
+    <div class="kaart plat klein"><b>Bediener</b><div class="mono sag" style="word-break:break-all">${esc(API)}</div></div></form>`, blad => {
+    const f = $('#if', blad.lyf);
+    f.onsubmit = async e => {
+      e.preventDefault();
+      await metKnop($('button.hoof', f), async () => {
+        try { const r = await api('instellings_stoor', { skool: f.skool.value, eposAan: f.eposAan.checked }); S.instellings.skool = r.skool; S.instellings.eposAan = r.eposAan; bewaarKas(); toast('Gestoor', 'goed'); blad.sluit(); teken(); }
+        catch (err) { wysFout(f, err); }
+      });
+    };
+  });
+}
+
+/* ---------------------------------------------------------------------
+   BEGIN
+--------------------------------------------------------------------- */
+(function begin() {
+  if (!API) return wysBedienerOpstel();
+  if (!S.token) {
+    return api('status').then(s => s.moetOpstel ? wysAdminOpstel() : wysAanmeld()).catch(e => wysAanmeld(e.message));
+  }
+  const kas = stoor.kry(K.kas, null);
+  if (kas && kas.gebruiker) {
+    Object.assign(S, kas, { gebruikers: kas.gebruikers || [] });
+    herIndekseer();
+    if (!S.gebruiker.moetVerander) teken();
+  } else {
+    $('#app').innerHTML = `<div class="voorblad">${LOGO}<h1>Laai data…</h1></div>`;
+  }
+  laaiAlles(true);
+})();
+</script>
+</body>
+</html>
