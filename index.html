@@ -258,7 +258,7 @@ const K = { api: 'dva_api', token: 'dva_token', kas: 'dva_kas', werk: 'dva_werk'
 let API = stoor.kry(K.api, '') || STANDAARD_API;
 const S = {
   token: stoor.kry(K.token, ''),
-  gebruiker: null, liggings: [], items: [], voorraad: [], uitlenings: [], gebreek: [], log: [], gebruikers: [],
+  gebruiker: null, liggings: [], items: [], voorraad: [], uitlenings: [], gebreek: [], log: [], gebruikers: [], versoeke: [],
   instellings: { skool: '', eposAan: true },
   blad: 'skandeer', gelaai: null, sincFout: false
 };
@@ -277,6 +277,7 @@ const voorraadVan = (bc, lid) => S.voorraad.find(v => v.barcode === bc && v.ligg
 const voorraadRye = bc => S.voorraad.filter(v => v.barcode === bc && magLig(v.liggingId) && IX.lig.get(v.liggingId)?.aktief);
 const totaalVan = bc => voorraadRye(bc).reduce((s, v) => s + v.hoeveelheid, 0);
 const oopLenings = bc => S.uitlenings.filter(l => l.status === 'oop' && (!bc || l.barcode === bc));
+const versoekeVirMy = () => S.versoeke.filter(v => v.status === 'wag' && magLig(v.vanLigging) && v.versoekerId !== S.gebruiker?.id);
 const isLaat = l => l.status === 'oop' && l.terugDatum && new Date(l.terugDatum) < new Date();
 const uitstaande = l => Math.round((l.hoeveelheid - l.terugGegee) * 100) / 100;
 
@@ -290,7 +291,7 @@ function werkLigging() {
 function bewaarKas() {
   stoor.stel(K.kas, {
     gebruiker: S.gebruiker, liggings: S.liggings, items: S.items, voorraad: S.voorraad, uitlenings: S.uitlenings,
-    gebreek: S.gebreek, log: S.log.slice(-400), gebruikers: S.gebruikers, instellings: S.instellings, gelaai: S.gelaai
+    gebreek: S.gebreek, log: S.log.slice(-400), gebruikers: S.gebruikers, versoeke: S.versoeke, instellings: S.instellings, gelaai: S.gelaai
   });
 }
 
@@ -353,6 +354,7 @@ function pasToe(res) {
   if (res.item) upsert(S.items, res.item, x => x.barcode === res.item.barcode);
   if (res.uitleen) upsert(S.uitlenings, res.uitleen, x => x.id === res.uitleen.id);
   if (res.gebreek) upsert(S.gebreek, res.gebreek, x => x.id === res.gebreek.id);
+  if (res.versoek) upsert(S.versoeke, res.versoek, x => x.id === res.versoek.id);
   if (res.ligging) upsert(S.liggings, res.ligging, x => x.id === res.ligging.id);
   if (res.gebruiker) {
     if (isAdmin()) upsert(S.gebruikers, res.gebruiker, x => x.id === res.gebruiker.id);
@@ -370,7 +372,7 @@ async function laaiAlles(stil) {
     const d = await api('laai');
     Object.assign(S, {
       gebruiker: d.gebruiker, liggings: d.liggings, items: d.items, voorraad: d.voorraad, uitlenings: d.uitlenings,
-      gebreek: d.gebreek, log: d.log, gebruikers: d.gebruikers || [], instellings: d.instellings, gelaai: new Date().toISOString()
+      gebreek: d.gebreek, log: d.log, gebruikers: d.gebruikers || [], versoeke: d.versoeke || [], instellings: d.instellings, gelaai: new Date().toISOString()
     });
     herIndekseer();
     bewaarKas();
@@ -606,7 +608,7 @@ function teken() {
   $('#kopTitel').textContent = S.instellings.skool || 'Lab Voorraad';
   $('#kopWie').textContent = `${S.gebruiker.naam} · ${isAdmin() ? 'Admin' : 'Onderwyser'}`;
   $('#sincTeks').textContent = S.gelaai ? new Date(S.gelaai).toTimeString().slice(0, 5) : '—';
-  const laat = oopLenings().filter(isLaat).length;
+  const laat = oopLenings().filter(isLaat).length + versoekeVirMy().length;
   $('#nav').innerHTML = BLAAIE.map(([k, n, ik]) =>
     `<button data-b="${k}" class="${S.blad === k ? 'aan' : ''}"><span class="ster">${ik}${k === 'uitleen' && laat ? `<b>${laat}</b>` : ''}</span>${n}</button>`).join('');
   $$('#nav button').forEach(b => b.onclick = () => { S.blad = b.dataset.b; teken(); window.scrollTo(0, 0); });
@@ -835,6 +837,7 @@ function itemKaart(item, metKnoppies) {
   const tot = totaalVan(item.barcode);
   const lenings = oopLenings(item.barcode);
   const laag = isAdmin() && item.minVoorraad > 0 && tot < item.minVoorraad;
+  const elders = item.aktief ? eldersBeskikbaar(item.barcode) : [];
   return `<div class="kaart">
     <div class="item-kop"><div class="ikoon">${IK.fles}</div>
       <div style="flex:1;min-width:0"><h2>${esc(item.naam)}</h2>
@@ -843,6 +846,8 @@ function itemKaart(item, metKnoppies) {
     ${laag ? `<p style="margin:10px 0 0"><span class="etiket amber">Lae voorraad · minimum ${fmtN(item.minVoorraad)}</span></p>` : ''}
     <ul class="voorraadlys">${rye.length ? rye.map(v => `<li><span>${esc(ligNaam(v.liggingId))}</span><b>${fmtN(v.hoeveelheid)}</b></li>`).join('') : '<li class="sag">Nog geen voorraad in jou liggings nie.</li>'}
     ${lenings.map(l => `<li><span><span class="etiket ${isLaat(l) ? 'rooi' : 'amber'}">${isLaat(l) ? 'Laat' : 'Uitgeleen'}</span> ${esc(ligNaam(l.vanLigging))} → ${esc(ligNaam(l.naLigging))}<br><span class="sag klein">${esc(l.persoon)} · terug ${fmtD(l.terugDatum)}</span></span><b>${fmtN(uitstaande(l))}</b></li>`).join('')}</ul>
+    ${elders.length ? `<div class="sag klein" style="margin:14px 2px 0;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Elders beskikbaar</div>
+      <ul class="voorraadlys" style="border-top:0;margin-top:4px">${elders.map(v => `<li><span>${esc(ligNaam(v.liggingId))} <b>${fmtN(v.hoeveelheid)}</b></span><button class="kn klein" data-vs="${esc(v.liggingId)}">Versoek</button></li>`).join('')}</ul>` : ''}
     ${metKnoppies ? `<div class="knrooster" style="margin-top:12px">
       <button class="kn" data-a="in">＋ In</button><button class="kn" data-a="uit">－ Uit</button>
       <button class="kn" data-a="leen">${IK.leen}<span>Leen uit</span></button><button class="kn" data-a="gebreek">${IK.gebreek}<span>Gebreek</span></button>
@@ -850,6 +855,7 @@ function itemKaart(item, metKnoppies) {
   </div>`;
 }
 function koppelItemKaart(houer, item) {
+  $$('[data-vs]', houer).forEach(b => b.onclick = () => versoekVorm(item.barcode, b.dataset.vs));
   $$('[data-a]', houer).forEach(b => b.onclick = () => {
     if (b.dataset.a === 'meer') return wysItemDetail(item.barcode);
     openAksie(b.dataset.a, item.barcode, werkLigging());
@@ -993,7 +999,7 @@ function wysItemVorm(item, kode) {
   const eenhede = [...new Set(['stuks', 'stelle', 'ml', 'g', 'L', 'kg', 'bottels', 'dose', ...S.items.map(i => i.eenheid).filter(Boolean)])];
   const html = `<form class="stapel" id="iv">
     <label class="veld"><span>Naam *</span><input class="inv" name="naam" required value="${esc(item?.naam || '')}" placeholder="bv. Beker 250 ml (glas)"></label>
-    <label class="veld"><span>Strepieskode</span><input class="inv mono" name="barcode" value="${esc(item?.barcode || kode || '')}" ${nuut ? '' : 'readonly'} placeholder="Los leeg — die stelsel maak een (LAB00001…)"></label>
+    <label class="veld"><span>Strepieskode</span><input class="inv mono" name="barcode" value="${esc(item?.barcode || kode || '')}" ${nuut ? '' : 'readonly'} placeholder="Los leeg — die stelsel maak een (bv. 20260001)"></label>
     ${nuut ? '<p class="sag klein" style="margin:-4px 2px 0">Het die item reeds \'n fabriek-strepieskode? Skandeer of tik dit hier. Anders los dit leeg en druk later \'n etiket.</p>' : ''}
     <div class="twee"><label class="veld"><span>Kategorie</span><input class="inv" name="kategorie" list="katlys" value="${esc(item?.kategorie || '')}" placeholder="bv. Glasware"><datalist id="katlys">${kategorieë.map(k => `<option value="${esc(k)}">`).join('')}</datalist></label>
     <label class="veld"><span>Eenheid</span><input class="inv" name="eenheid" list="eenlys" value="${esc(item?.eenheid || 'stuks')}"><datalist id="eenlys">${eenhede.map(k => `<option value="${esc(k)}">`).join('')}</datalist></label></div>
@@ -1092,19 +1098,146 @@ function tekenUitleen() {
   const oop = oopLenings().sort((a, b) => (a.terugDatum || '9').localeCompare(b.terugDatum || '9'));
   const laat = oop.filter(isLaat);
   const terug = S.uitlenings.filter(l => l.status !== 'oop').sort((a, b) => (b.terugOp || '').localeCompare(a.terugOp || '')).slice(0, 60);
-  const lys = { oop, laat, terug }[uOortjie];
+  const virMy = versoekeVirMy();
+  const myne = S.versoeke.filter(v => v.versoekerId === S.gebruiker.id && v.status === 'wag');
   $('#inhoud').innerHTML = `
     <div class="skyfies" style="margin-bottom:12px">
       <button class="skyf ${uOortjie === 'oop' ? 'aan' : ''}" data-o="oop">Uitstaande (${oop.length})</button>
       <button class="skyf ${uOortjie === 'laat' ? 'aan' : ''}" data-o="laat">Laat (${laat.length})</button>
+      <button class="skyf ${uOortjie === 'versoeke' ? 'aan' : ''}" data-o="versoeke">Versoeke${virMy.length + myne.length ? ` (${virMy.length + myne.length})` : ''}</button>
       <button class="skyf ${uOortjie === 'terug' ? 'aan' : ''}" data-o="terug">Terugbesorg</button></div>
-    ${lys.length ? lys.map(leenKaart).join('') : `<div class="kaart leeg-lys">${uOortjie === 'laat' ? 'Niks is laat nie. 👍' : 'Niks hier nie.'}</div>`}
-    <button class="fab" id="nuweLeen" aria-label="Nuwe uitleen">${IK.plus}</button>`;
+    <div id="uLyf"></div>
+    <button class="fab" id="nuweLeen" aria-label="${uOortjie === 'versoeke' ? 'Nuwe versoek' : 'Nuwe uitleen'}">${IK.plus}</button>`;
+  if (uOortjie === 'versoeke') tekenVersoeke($('#uLyf'));
+  else {
+    const lys = { oop, laat, terug }[uOortjie];
+    $('#uLyf').innerHTML = lys.length ? lys.map(leenKaart).join('') : `<div class="kaart leeg-lys">${uOortjie === 'laat' ? 'Niks is laat nie. 👍' : 'Niks hier nie.'}</div>`;
+    $$('[data-terug]').forEach(b => b.onclick = () => terugbesorg(b.dataset.terug));
+    $$('[data-item]').forEach(b => b.onclick = () => wysItemDetail(b.dataset.item));
+  }
   $$('[data-o]').forEach(b => b.onclick = () => { uOortjie = b.dataset.o; tekenUitleen(); });
-  $$('[data-terug]').forEach(b => b.onclick = () => terugbesorg(b.dataset.terug));
-  $$('[data-item]').forEach(b => b.onclick = () => wysItemDetail(b.dataset.item));
-  $('#nuweLeen').onclick = () => kiesItem({ titel: 'Wat word uitgeleen?', by: it => openAksie('leen', it.barcode, werkLigging()) });
+  $('#nuweLeen').onclick = () => uOortjie === 'versoeke'
+    ? kiesItem({ titel: 'Wat wil jy leen?', by: it => kiesBron(it) })
+    : kiesItem({ titel: 'Wat word uitgeleen?', by: it => openAksie('leen', it.barcode, werkLigging()) });
 }
+
+/* ---------------------------------------------------------------------
+   VERSOEKE — iemand wil iets uit 'n ander lab leen
+--------------------------------------------------------------------- */
+const VS_STATUS = { wag: ['Wag', 'amber'], goedgekeur: ['Goedgekeur', 'groen'], afgekeur: ['Afgekeur', 'rooi'], gekanselleer: ['Gekanselleer', 'grys'] };
+function eldersBeskikbaar(bc) {
+  return S.voorraad.filter(v => v.barcode === bc && v.hoeveelheid > 0 && !magLig(v.liggingId) && IX.lig.get(v.liggingId)?.aktief)
+    .sort((a, b) => b.hoeveelheid - a.hoeveelheid);
+}
+function kiesBron(item) {
+  const bronne = S.voorraad.filter(v => v.barcode === item.barcode && v.hoeveelheid > 0 && IX.lig.get(v.liggingId)?.aktief && (!isAdmin() ? !magLig(v.liggingId) : true));
+  if (!bronne.length) return toast(`${item.naam} is nie elders beskikbaar nie.`, 'fout');
+  if (bronne.length === 1) return versoekVorm(item.barcode, bronne[0].liggingId);
+  maakBlad('Uit watter lab?', `<div class="lys">${bronne.map(v => `<button class="el" data-l="${esc(v.liggingId)}"><div class="hoof-teks"><b>${esc(ligNaam(v.liggingId))}</b></div><div class="getal">${fmtN(v.hoeveelheid)}</div></button>`).join('')}</div>`, b => {
+    $$('[data-l]', b.lyf).forEach(el => el.onclick = () => { b.sluit(); versoekVorm(item.barcode, el.dataset.l); });
+  });
+}
+function versoekVorm(barcode, vanLig) {
+  const item = IX.item.get(barcode);
+  const beskikbaar = voorraadVan(barcode, vanLig);
+  const na = myLiggings().filter(l => l.id !== vanLig);
+  if (!na.length) return toast('Jy het nog geen eie klas of lab waarheen dit kan gaan nie. Vra die admin.', 'fout');
+  const terug = new Date(); terug.setDate(terug.getDate() + 7);
+  maakBlad('Versoek om te leen', `
+    <div class="ry tussen" style="margin-bottom:12px"><div><b>${esc(item.naam)}</b><div class="sag klein mono">${esc(item.barcode)}</div></div>
+      <div style="text-align:right"><div class="sag klein">Beskikbaar in ${esc(ligNaam(vanLig))}</div><b>${fmtN(beskikbaar)}</b> <span class="sag klein">${esc(item.eenheid || '')}</span></div></div>
+    <form class="stapel" id="vf">
+      <label class="veld"><span>Hoeveel?</span><div class="stapper"><button type="button" data-d="-1">−</button><input name="hoeveelheid" type="number" inputmode="decimal" step="any" min="0" max="${beskikbaar}" value="1" data-fokus="nee"><button type="button" data-d="1">+</button></div></label>
+      <label class="veld"><span>Na watter van jou liggings?</span>${ligKeuse('naLigging', werkLigging(), na)}</label>
+      <div class="twee"><label class="veld"><span>Nodig op</span><input class="inv" name="nodigOp" type="date" min="${isoDag(new Date())}"></label>
+      <label class="veld"><span>Terug teen</span><input class="inv" name="terugDatum" type="date" value="${isoDag(terug)}" min="${isoDag(new Date())}"></label></div>
+      <label class="veld"><span>Waarvoor? (word saam gestuur)</span><textarea class="inv" name="nota" placeholder="bv. Graad 11 prakties, Donderdag 2de periode"></textarea></label>
+      <p class="sag klein" style="margin:0">Die onderwyser verantwoordelik vir ${esc(ligNaam(vanLig))} kry 'n e-pos en kan dit goed- of afkeur.</p>
+      <button class="kn hoof vol">Stuur versoek</button></form>`, blad => {
+    const f = $('#vf', blad.lyf);
+    $$('.stapper button', f).forEach(k => k.onclick = () => { const n = getal(f.hoeveelheid.value) || 0; f.hoeveelheid.value = Math.min(beskikbaar, Math.max(0, n + Number(k.dataset.d))); });
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(f));
+      const n = getal(d.hoeveelheid);
+      if (!(n > 0 && n <= beskikbaar)) return wysFout(f, new Error(`Kies 'n hoeveelheid tussen 1 en ${fmtN(beskikbaar)}.`));
+      await metKnop($('button.vol', f), async () => {
+        try {
+          const r = await skryf('versoek_skep', { ...d, hoeveelheid: n, barcode, vanLigging: vanLig, toepUrl: location.origin + location.pathname });
+          toast(r.ontvangers ? `Versoek gestuur — ${r.ontvangers} persoon${r.ontvangers === 1 ? '' : 'e'} kry 'n e-pos` : 'Versoek gestoor', 'goed');
+          blad.sluit(); uOortjie = 'versoeke'; herteken();
+        } catch (err) { wysFout(f, err); }
+      });
+    };
+  });
+}
+function versoekKaart(v, rol) {
+  const it = IX.item.get(v.barcode);
+  const [st, kl] = VS_STATUS[v.status] || [v.status, 'grys'];
+  return `<div class="kaart">
+    <div class="ry tussen"><div style="min-width:0"><b data-item="${esc(v.barcode)}" style="cursor:pointer">${esc(it?.naam || v.barcode)}</b>
+      <div class="sag klein">${esc(ligNaam(v.vanLigging))} → ${esc(ligNaam(v.naLigging))}</div></div>
+      <div style="text-align:right"><div class="totaal" style="font-size:1.5rem">${fmtN(v.hoeveelheid)}</div><span class="etiket ${kl}">${st}</span></div></div>
+    <ul class="voorraadlys">
+      <li><span class="sag">Versoek deur</span><span>${esc(v.versoeker)}</span></li>
+      <li><span class="sag">Gestuur</span><span>${fmtDT(v.geskep)}</span></li>
+      ${v.nodigOp ? `<li><span class="sag">Nodig op</span><span>${fmtD(v.nodigOp)}</span></li>` : ''}
+      ${v.terugDatum ? `<li><span class="sag">Terug teen</span><span>${fmtD(v.terugDatum)}</span></li>` : ''}
+      ${v.nota ? `<li><span class="sag">Waarvoor</span><span>${esc(v.nota)}</span></li>` : ''}
+      ${v.status !== 'wag' ? `<li><span class="sag">${v.status === 'gekanselleer' ? 'Gekanselleer' : 'Antwoord'} deur</span><span>${esc(v.antwoordDeur)} · ${fmtD(v.antwoordOp)}</span></li>` : ''}
+      ${v.antwoordNota ? `<li><span class="sag">Nota</span><span>${esc(v.antwoordNota)}</span></li>` : ''}</ul>
+    ${rol === 'antwoord' ? `<div class="twee" style="margin-top:12px"><button class="kn gevaar" data-nee="${esc(v.id)}">Keur af</button><button class="kn hoof" data-ja="${esc(v.id)}">Keur goed</button></div>` : ''}
+    ${rol === 'myne' && v.status === 'wag' ? `<button class="kn vol klein" style="margin-top:12px" data-kans="${esc(v.id)}">Kanselleer versoek</button>` : ''}
+  </div>`;
+}
+function tekenVersoeke(houer) {
+  const virMy = versoekeVirMy().sort((a, b) => (a.geskep || '').localeCompare(b.geskep || ''));
+  const myne = S.versoeke.filter(v => v.versoekerId === S.gebruiker.id).sort((a, b) => (b.geskep || '').localeCompare(a.geskep || '')).slice(0, 30);
+  const ander = S.versoeke.filter(v => v.status !== 'wag' && v.versoekerId !== S.gebruiker.id).sort((a, b) => (b.antwoordOp || '').localeCompare(a.antwoordOp || '')).slice(0, 20);
+  houer.innerHTML = `
+    <div class="afdeling">Wag vir jou antwoord (${virMy.length})</div>
+    ${virMy.length ? virMy.map(v => versoekKaart(v, 'antwoord')).join('') : '<div class="kaart plat sag">Niemand wag op jou nie.</div>'}
+    <div class="afdeling">My versoeke</div>
+    ${myne.length ? myne.map(v => versoekKaart(v, 'myne')).join('') : '<div class="kaart plat sag">Jy het nog niks versoek nie. Druk <b>+</b>, of maak \'n item oop en kies <b>Versoek</b> by \'n ander lab.</div>'}
+    ${ander.length ? `<div class="afdeling">Onlangs hanteer</div>${ander.map(v => versoekKaart(v, '')).join('')}` : ''}`;
+  $$('[data-item]', houer).forEach(b => b.onclick = () => wysItemDetail(b.dataset.item));
+  $$('[data-ja]', houer).forEach(b => b.onclick = () => antwoordVersoek(b.dataset.ja, 'goedkeur'));
+  $$('[data-nee]', houer).forEach(b => b.onclick = () => antwoordVersoek(b.dataset.nee, 'afkeur'));
+  $$('[data-kans]', houer).forEach(b => b.onclick = async () => {
+    if (!await bevestig('Kanselleer hierdie versoek?', 'Kanselleer', true)) return;
+    try { await skryf('versoek_kanselleer', { id: b.dataset.kans }); toast('Gekanselleer', 'goed'); herteken(); } catch (e) { toast(e.message, 'fout'); }
+  });
+}
+function antwoordVersoek(id, aksie) {
+  const v = S.versoeke.find(x => x.id === id);
+  const it = IX.item.get(v.barcode);
+  const beskikbaar = voorraadVan(v.barcode, v.vanLigging);
+  const ja = aksie === 'goedkeur';
+  const terug = v.terugDatum ? v.terugDatum.slice(0, 10) : isoDag(new Date(Date.now() + 7 * 864e5));
+  maakBlad(ja ? 'Keur goed' : 'Keur af', `<p style="margin-top:0"><b>${esc(v.versoeker)}</b> wil <b>${fmtN(v.hoeveelheid)} × ${esc(it?.naam || v.barcode)}</b> uit ${esc(ligNaam(v.vanLigging))} leen.</p>
+    <form class="stapel" id="af">
+    ${ja ? `<label class="veld"><span>Hoeveel gee jy? (beskikbaar: ${fmtN(beskikbaar)})</span><input class="inv" name="hoeveelheid" type="number" inputmode="decimal" step="any" min="0" max="${beskikbaar}" value="${Math.min(v.hoeveelheid, beskikbaar)}"></label>
+      <label class="veld"><span>Terug teen</span><input class="inv" name="terugDatum" type="date" value="${esc(terug)}"></label>` : ''}
+    <label class="veld"><span>${ja ? 'Nota aan die versoeker (opsioneel)' : 'Rede (word aan die versoeker gestuur)'}</span><textarea class="inv" name="nota" ${ja ? 'placeholder="bv. Haal dit by kas 3"' : 'required'}></textarea></label>
+    <p class="sag klein" style="margin:0">${ja ? 'Dit word as \'n uitlening aangeteken en die voorraad word van jou lab afgetrek.' : ''} ${esc(v.versoeker)} kry 'n e-pos.</p>
+    <button class="kn ${ja ? 'hoof' : 'gevaar'} vol">${ja ? 'Keur goed en leen uit' : 'Keur af'}</button></form>`, blad => {
+    const f = $('#af', blad.lyf);
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(f));
+      if (ja) { const n = getal(d.hoeveelheid); if (!(n > 0 && n <= beskikbaar)) return wysFout(f, new Error(`Kies 'n hoeveelheid tussen 1 en ${fmtN(beskikbaar)}.`)); d.hoeveelheid = n; }
+      await metKnop($('button.vol', f), async () => {
+        try {
+          await skryf('versoek_antwoord', { id, aksie, ...d, toepUrl: location.origin + location.pathname });
+          if (ja) plaaslikeLog('LEEN', v.barcode, v.vanLigging, d.hoeveelheid, `${v.versoeker} → ${ligNaam(v.naLigging)}`);
+          toast(ja ? 'Goedgekeur en uitgeleen' : 'Afgekeur', 'goed');
+          blad.sluit(); herteken();
+        } catch (err) { wysFout(f, err); }
+      });
+    };
+  });
+}
+
 function leenKaart(l) {
   const it = IX.item.get(l.barcode);
   const laat = isLaat(l);
@@ -1157,18 +1290,45 @@ function terugbesorg(id) {
 --------------------------------------------------------------------- */
 const C128 = '212222,222122,222221,121223,121322,131222,122213,122312,132212,221213,221312,231212,112232,122132,122231,113222,123122,123221,223211,221132,221231,213212,223112,312131,311222,321122,321221,312212,322112,322211,212123,212321,232121,111323,131123,131321,112313,132113,132311,211313,231113,231311,112133,112331,132131,113123,113321,133121,313121,211331,231131,213113,213311,213131,311123,311321,331121,312113,312311,332111,314111,221411,431111,111224,111422,121124,121421,141122,141221,112214,112412,122114,122411,142112,142211,241211,221114,413111,241112,134111,111242,121142,121241,114212,124112,124211,411212,421112,421211,212141,214121,412121,111143,111341,131141,114113,114311,411113,411311,113141,114131,311141,411131,211412,211214,211232,2331112'.split(',');
 
-/** Gee 'n lys stafwydtes (stafie, spasie, stafie, …) in modules terug. Code 128 stel B. */
-function code128(teks) {
-  const waardes = [104];
-  for (const ch of String(teks)) {
+/**
+ * Gee 'n lys stafwydtes (stafie, spasie, stafie, …) in modules terug.
+ * Code 128 met outomatiese keuse tussen stel B (teks) en stel C (syferpare),
+ * sodat syfer-kodes soos 20240001 die helfte so breed is.
+ */
+function code128Waardes(teks) {
+  const s = String(teks);
+  if (!s.length) throw new Error('Leë strepieskode.');
+  for (const ch of s) {
     const c = ch.charCodeAt(0);
     if (c < 32 || c > 126) throw new Error(`Die karakter "${ch}" kan nie in 'n strepieskode nie.`);
-    waardes.push(c - 32);
   }
-  let som = 104;
-  for (let i = 1; i < waardes.length; i++) som += waardes[i] * i;
-  waardes.push(som % 103, 106);
-  return waardes.flatMap(v => C128[v].split('').map(Number));
+  const isSyf = i => i < s.length && s.charCodeAt(i) >= 48 && s.charCodeAt(i) <= 57;
+  const syfers = i => { let n = 0; while (isSyf(i + n)) n++; return n; };
+  const w = [];
+  let stel, i = 0;
+  const eerste = syfers(0);
+  if (eerste >= 4 || (eerste === s.length && eerste >= 2)) {
+    stel = 'C'; w.push(105);
+  } else { stel = 'B'; w.push(104); }
+  while (i < s.length) {
+    if (stel === 'C') {
+      if (syfers(i) >= 2) { w.push(Number(s.substr(i, 2))); i += 2; continue; }
+      w.push(100); stel = 'B'; continue;
+    }
+    const n = syfers(i);
+    if (n >= 6 || (n >= 4 && i + n === s.length)) {
+      if (n % 2) { w.push(s.charCodeAt(i) - 32); i++; }
+      w.push(99); stel = 'C'; continue;
+    }
+    w.push(s.charCodeAt(i) - 32); i++;
+  }
+  let som = w[0];
+  for (let k = 1; k < w.length; k++) som += w[k] * k;
+  w.push(som % 103, 106);
+  return w;
+}
+function code128(teks) {
+  return code128Waardes(teks).flatMap(v => C128[v].split('').map(Number));
 }
 
 function strepieSvg(teks) {
@@ -1208,6 +1368,8 @@ class KleinPdf {
     return uit.map(r => this.pas(r, maks, grootte, vet));
   }
   reghoek(x, y, w, h) { this.ops.push(`${this.pt(x)} ${this.pt(this.bh - y - h)} ${this.pt(w)} ${this.pt(h)} re f`); }
+  vul(x, y, w, h, kleur) { this.ops.push(`q ${kleur.join(' ')} rg ${this.pt(x)} ${this.pt(this.bh - y - h)} ${this.pt(w)} ${this.pt(h)} re f Q`); }
+  streep(x1, y1, x2, y2, grys = .8, dik = .2) { this.ops.push(`q ${grys} G ${dik} w ${this.pt(x1)} ${this.pt(this.bh - y1)} m ${this.pt(x2)} ${this.pt(this.bh - y2)} l S Q`); }
   lyn(x1, y1, x2, y2, grys = .75) { this.ops.push(`q ${grys} G 0.25 w [2 2] 0 d ${this.pt(x1)} ${this.pt(this.bh - y1)} m ${this.pt(x2)} ${this.pt(this.bh - y2)} l S Q`); }
   teks(t, x, y, grootte, { vet = false, belyn = 'links', grys = 0 } = {}) {
     let bytes = '';
@@ -1246,6 +1408,7 @@ class KleinPdf {
 }
 
 const UITLEGTE = {
+  'w115': { naam: 'W115 · 45 per blad · 40,5 × 29,9 mm (jou Word-vel)', kol: 5, ry: 9, w: 40.5, h: 29.9, x: 4.05, y: 14.55, gx: 0, gy: 0 },
   '3x8': { naam: '24 per blad · 70 × 37 mm', kol: 3, ry: 8, w: 70, h: 37, x: 0, y: 0.5, gx: 0, gy: 0 },
   '3x7': { naam: '21 per blad · 70 × 42,3 mm', kol: 3, ry: 7, w: 70, h: 42.3, x: 0, y: 0.4, gx: 0, gy: 0 },
   '2x7': { naam: '14 per blad · 99,1 × 38,1 mm', kol: 2, ry: 7, w: 99.1, h: 38.1, x: 4.65, y: 15.15, gx: 2.5, gy: 0 },
@@ -1254,7 +1417,7 @@ const UITLEGTE = {
 };
 
 function etiketInstellings() {
-  return Object.assign({ lys: [], uitleg: '3x8', begin: 1, skool: true, dx: 0, dy: 0 }, stoor.kry(K.etiket, {}));
+  return Object.assign({ lys: [], uitleg: 'w115', begin: 1, skool: false, naam: true, dx: 0, dy: 0 }, stoor.kry(K.etiket, {}));
 }
 function stelEtiket(e) { stoor.stel(K.etiket, e); }
 function voegEtiketBy(barcode, aantal) {
@@ -1265,7 +1428,7 @@ function voegEtiketBy(barcode, aantal) {
 }
 
 function maakEtiketPdf(e) {
-  const U = UITLEGTE[e.uitleg] || UITLEGTE['3x8'];
+  const U = UITLEGTE[e.uitleg] || UITLEGTE.w115;
   const perBlad = U.kol * U.ry;
   const reeks = [];
   e.lys.forEach(x => { const it = IX.item.get(x.bc); if (it) for (let i = 0; i < x.n; i++) reeks.push(it); });
@@ -1283,23 +1446,25 @@ function maakEtiketPdf(e) {
     if (plek >= perBlad) { pdf.nuweBlad(); snylyne(); plek = 0; }
     const c = plek % U.kol, r = Math.floor(plek / U.kol);
     const x = U.x + c * (U.w + U.gx) + e.dx, y = U.y + r * (U.h + U.gy) + e.dy;
-    teken1Etiket(pdf, item, x, y, U.w, U.h, skool);
+    teken1Etiket(pdf, item, x, y, U.w, U.h, skool, e.naam !== false);
     plek++;
   });
   return pdf.bou();
 }
 
-function teken1Etiket(pdf, item, x, y, w, h, skool) {
+function teken1Etiket(pdf, item, x, y, w, h, skool, metNaam = true) {
   const pad = Math.min(3, w * .05);
   const binne = w - 2 * pad;
   let yy = y + pad;
   const klein = h < 32;
   if (skool) { yy += 2; pdf.teks(pdf.pas(skool, binne, 5.5), x + w / 2, yy, 5.5, { belyn: 'middel', grys: .4 }); yy += .8; }
-  const ng = klein ? 7.5 : 9;
-  const lyne = pdf.vou(item.naam, binne, ng, true, h >= 40 ? 2 : 1);
-  lyne.forEach(l => { yy += ng * .3528 + .6; pdf.teks(l, x + w / 2, yy, ng, { vet: true, belyn: 'middel' }); });
-  yy += 1.5;
-  const kodeGrootte = klein ? 7 : 8;
+  if (metNaam) {
+    const ng = klein ? 7 : 9;
+    const lyne = pdf.vou(item.naam, binne, ng, true, h >= 40 ? 2 : 1);
+    lyne.forEach(l => { yy += ng * .3528 + .6; pdf.teks(l, x + w / 2, yy, ng, { vet: true, belyn: 'middel' }); });
+    yy += 1.5;
+  } else yy += 1;
+  const kodeGrootte = klein ? 8 : 9;
   const onder = y + h - pad - kodeGrootte * .3528 - .8;
   const stafH = Math.max(6, Math.min(onder - yy, 20));
   const wydtes = code128(item.barcode);
@@ -1314,14 +1479,14 @@ function tekenEtikette() {
   const e = etiketInstellings();
   e.lys = e.lys.filter(x => IX.item.get(x.bc)?.aktief);
   stelEtiket(e);
-  const U = UITLEGTE[e.uitleg] || UITLEGTE['3x8'];
+  const U = UITLEGTE[e.uitleg] || UITLEGTE.w115;
   const totaal = e.lys.reduce((s, x) => s + x.n, 0);
   const bladsye = totaal ? Math.ceil((totaal + (Number(e.begin) || 1) - 1) / (U.kol * U.ry)) : 0;
   const eerste = e.lys[0] && IX.item.get(e.lys[0].bc);
   $('#inhoud').innerHTML = `
     <div class="kaart stapel">
       <div class="ry tussen"><h2 style="font-size:1.05rem">Strepieskode-etikette</h2><span class="etiket">${totaal} etiket${totaal === 1 ? '' : 'te'} · ${bladsye} blad${bladsye === 1 ? '' : 'e'}</span></div>
-      ${eerste ? `<div class="voorskou">${e.skool && S.instellings.skool ? `<div class="s">${esc(S.instellings.skool)}</div>` : ''}<div class="n">${esc(eerste.naam)}</div>${strepieSvg(eerste.barcode)}<div class="k">${esc(eerste.barcode)}</div></div>` : '<p class="sag" style="margin:0">Kies watter items etikette moet kry.</p>'}
+      ${eerste ? `<div class="voorskou">${e.skool && S.instellings.skool ? `<div class="s">${esc(S.instellings.skool)}</div>` : ''}${e.naam !== false ? `<div class="n">${esc(eerste.naam)}</div>` : ''}${strepieSvg(eerste.barcode)}<div class="k">${esc(eerste.barcode)}</div></div>` : '<p class="sag" style="margin:0">Kies watter items etikette moet kry.</p>'}
       <div class="twee"><button class="kn" id="eVoeg">${IK.plus}<span>Voeg items by</span></button><button class="kn" id="eAlles">Alle items</button></div>
     </div>
     ${e.lys.length ? `<div class="lys" style="margin-bottom:12px">${e.lys.map((x, i) => { const it = IX.item.get(x.bc); return `<div class="el" style="cursor:default"><div class="hoof-teks"><b>${esc(it.naam)}</b><span class="sag klein mono">${esc(it.barcode)}</span></div>
@@ -1330,6 +1495,7 @@ function tekenEtikette() {
     <div class="kaart stapel">
       <label class="veld"><span>Plakkervel</span><select class="inv" id="eUit">${Object.entries(UITLEGTE).map(([k, u]) => `<option value="${k}" ${k === e.uitleg ? 'selected' : ''}>${u.naam}</option>`).join('')}</select></label>
       <label class="veld"><span>Begin by etiket nr. (as die vel al deels gebruik is)</span><input class="inv" id="eBegin" type="number" min="1" max="${U.kol * U.ry}" value="${e.begin}"></label>
+      <label class="skakel"><input type="checkbox" id="eNaam" ${e.naam !== false ? 'checked' : ''}><span>Druk itemnaam bo die strepieskode</span></label>
       <label class="skakel"><input type="checkbox" id="eSkool" ${e.skool ? 'checked' : ''}><span>Druk skoolnaam bo-aan elke etiket</span></label>
       <details class="gevorderd"><summary>Drukker-aanpassing</summary><div class="twee" style="margin-top:8px">
         <label class="veld"><span>Skuif regs (mm)</span><input class="inv" id="eDx" type="number" step="0.5" value="${e.dx}"></label>
@@ -1348,6 +1514,7 @@ function tekenEtikette() {
   $('#eUit').onchange = ev => stel('uitleg', ev.target.value);
   $('#eBegin').onchange = ev => stel('begin', Math.max(1, Math.floor(getal(ev.target.value) || 1)));
   $('#eSkool').onchange = ev => stel('skool', ev.target.checked);
+  $('#eNaam').onchange = ev => stel('naam', ev.target.checked);
   $('#eDx').onchange = ev => stel('dx', getal(ev.target.value) || 0);
   $('#eDy').onchange = ev => stel('dy', getal(ev.target.value) || 0);
   $('#ePdf').onclick = () => {
@@ -1359,15 +1526,522 @@ function tekenEtikette() {
   };
 }
 
-async function laaiAf(blob, naam) {
+async function laaiAf(blob, naam, opsies = {}) {
   const lêer = typeof File === 'function' ? new File([blob], naam, { type: blob.type }) : null;
   const url = URL.createObjectURL(blob);
-  maakBlad('PDF is gereed', `<p style="margin-top:0">Jou etikette is gereed. Druk op <b>100% / werklike grootte</b>.</p>
-    <div class="stapel"><a class="kn hoof vol" href="${url}" download="${esc(naam)}">${IK.dok}<span>Laai PDF af</span></a>
-    <a class="kn vol" href="${url}" target="_blank" rel="noopener">Maak oop in nuwe oortjie</a>
-    ${lêer && navigator.canShare && navigator.canShare({ files: [lêer] }) ? '<button class="kn vol" id="deel">Deel / stuur na drukker…</button>' : ''}</div>`, b => {
+  const isPdf = blob.type === 'application/pdf';
+  maakBlad(opsies.titel || (isPdf ? 'PDF is gereed' : 'Lêer is gereed'), `<p style="margin-top:0">${opsies.teks ?? 'Jou etikette is gereed. Druk op <b>100% / werklike grootte</b>.'}</p>
+    <div class="stapel"><a class="kn hoof vol" href="${url}" download="${esc(naam)}">${IK.dok}<span>Laai ${isPdf ? 'PDF' : 'Excel-lêer'} af</span></a>
+    ${isPdf ? `<a class="kn vol" href="${url}" target="_blank" rel="noopener">Maak oop in nuwe oortjie</a>` : ''}
+    ${lêer && navigator.canShare && navigator.canShare({ files: [lêer] }) ? '<button class="kn vol" id="deel">Deel / stuur…</button>' : ''}</div>`, b => {
     b.toe = () => setTimeout(() => URL.revokeObjectURL(url), 60000);
     if ($('#deel', b.lyf)) $('#deel', b.lyf).onclick = () => navigator.share({ files: [lêer], title: naam }).catch(() => { });
+  });
+}
+
+/* ---------------------------------------------------------------------
+   ZIP en EXCEL (.xlsx) — lees en skryf sonder ekstra biblioteke
+--------------------------------------------------------------------- */
+const CRC_TABEL = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_TABEL[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+
+function maakZip(lêers) {
+  const enc = new TextEncoder();
+  const dele = [], sentraal = [];
+  let posisie = 0;
+  lêers.forEach(f => {
+    const naam = enc.encode(f.naam), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, 0, true); h.setUint16(12, 0x21, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true);
+    h.setUint32(22, data.length, true); h.setUint16(26, naam.length, true); h.setUint16(28, 0, true);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+    c.setUint16(10, 0, true); c.setUint16(12, 0, true); c.setUint16(14, 0x21, true); c.setUint32(16, crc, true);
+    c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, naam.length, true);
+    c.setUint32(42, posisie, true);
+    dele.push(new Uint8Array(h.buffer), naam, data);
+    sentraal.push(new Uint8Array(c.buffer), naam);
+    posisie += 30 + naam.length + data.length;
+  });
+  const cdGrootte = sentraal.reduce((a, b) => a + b.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, lêers.length, true); e.setUint16(10, lêers.length, true);
+  e.setUint32(12, cdGrootte, true); e.setUint32(16, posisie, true);
+  return new Blob([...dele, ...sentraal, new Uint8Array(e.buffer)]);
+}
+
+async function leesZip(buf) {
+  const b = new Uint8Array(buf), d = new DataView(buf);
+  let e = -1;
+  for (let i = b.length - 22; i >= Math.max(0, b.length - 66000); i--) if (d.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('Dit lyk nie soos \'n .xlsx-lêer nie.');
+  const aantal = d.getUint16(e + 10, true);
+  let p = d.getUint32(e + 16, true);
+  const dek = new TextDecoder();
+  const uit = {};
+  for (let n = 0; n < aantal; n++) {
+    if (d.getUint32(p, true) !== 0x02014b50) break;
+    const metode = d.getUint16(p + 10, true), grootte = d.getUint32(p + 20, true);
+    const nl = d.getUint16(p + 28, true), xl = d.getUint16(p + 30, true), kl = d.getUint16(p + 32, true);
+    const lok = d.getUint32(p + 42, true);
+    const naam = dek.decode(b.subarray(p + 46, p + 46 + nl));
+    p += 46 + nl + xl + kl;
+    if (!/\.(xml|rels)$/.test(naam)) continue;
+    const begin = lok + 30 + d.getUint16(lok + 26, true) + d.getUint16(lok + 28, true);
+    const data = b.subarray(begin, begin + grootte);
+    uit[naam] = () => metode === 0 ? Promise.resolve(dek.decode(data)) : pakUit(data).then(x => dek.decode(x));
+  }
+  return uit;
+}
+async function pakUit(data) {
+  if (typeof DecompressionStream !== 'function') throw new Error('Hierdie blaaier kan nie .xlsx lees nie. Stoor die lêer as CSV en probeer weer.');
+  const s = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+
+const kolNr = ref => { let n = 0; for (const ch of ref.replace(/\d+$/, '')) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+const kolLetter = i => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+const xmlDoc = t => new DOMParser().parseFromString(t, 'application/xml');
+const tags = (el, n) => Array.from(el.getElementsByTagNameNS('*', n));
+
+/** Lees 'n .xlsx: gee [{ naam, rye: [[teks…]] }] terug */
+async function leesXlsx(buf) {
+  const z = await leesZip(buf);
+  if (!z['xl/workbook.xml']) throw new Error('Geen werkboek in die lêer gevind nie.');
+  const wb = xmlDoc(await z['xl/workbook.xml']());
+  const rels = z['xl/_rels/workbook.xml.rels'] ? xmlDoc(await z['xl/_rels/workbook.xml.rels']()) : null;
+  const teiken = {};
+  if (rels) tags(rels, 'Relationship').forEach(r => { teiken[r.getAttribute('Id')] = r.getAttribute('Target'); });
+  let gedeel = [];
+  if (z['xl/sharedStrings.xml']) {
+    gedeel = tags(xmlDoc(await z['xl/sharedStrings.xml']()), 'si').map(si => tags(si, 't').map(t => t.textContent).join(''));
+  }
+  const blaaie = [];
+  const lys = tags(wb, 'sheet');
+  for (let i = 0; i < lys.length; i++) {
+    const sh = lys[i];
+    const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    let pad = teiken[rid] || `worksheets/sheet${i + 1}.xml`;
+    pad = pad.startsWith('/') ? pad.slice(1) : 'xl/' + pad.replace(/^\.\//, '');
+    if (!z[pad]) continue;
+    const doc = xmlDoc(await z[pad]());
+    const rye = [];
+    tags(doc, 'row').forEach(ry => {
+      const r = Number(ry.getAttribute('r')) - 1;
+      const waardes = [];
+      let k = 0;
+      tags(ry, 'c').forEach(c => {
+        const ref = c.getAttribute('r');
+        if (ref) k = kolNr(ref);
+        const t = c.getAttribute('t');
+        const v = tags(c, 'v')[0]?.textContent ?? '';
+        let w;
+        if (t === 's') w = gedeel[Number(v)] ?? '';
+        else if (t === 'inlineStr') w = tags(c, 't').map(x => x.textContent).join('');
+        else if (t === 'b') w = v === '1' ? 'WAAR' : 'VALS';
+        else if (t === 'e') w = '';
+        else w = getalTeks(v);
+        waardes[k] = w;
+        k++;
+      });
+      rye[r >= 0 ? r : rye.length] = Array.from(waardes, x => x ?? '');
+    });
+    blaaie.push({ naam: sh.getAttribute('name'), rye: Array.from(rye, x => x || []) });
+  }
+  return blaaie;
+}
+function getalTeks(v) {
+  if (/^-?\d+(\.\d+)?[eE][+-]?\d+$/.test(v)) { const n = Number(v); if (Number.isInteger(n)) return BigInt(n).toString(); return String(n); }
+  if (/^-?\d+\.\d{9,}$/.test(v)) { const n = Math.round(Number(v) * 1e6) / 1e6; return String(n); }
+  return v;
+}
+function leesCsv(teks) {
+  teks = teks.replace(/^﻿/, '');
+  const eerste = teks.split(/\r?\n/)[0] || '';
+  const skeier = [';', '\t', ','].sort((a, b) => eerste.split(b).length - eerste.split(a).length)[0];
+  const rye = []; let ry = [], veld = '', aanh = false;
+  for (let i = 0; i < teks.length; i++) {
+    const c = teks[i];
+    if (aanh) { if (c === '"') { if (teks[i + 1] === '"') { veld += '"'; i++; } else aanh = false; } else veld += c; continue; }
+    if (c === '"') aanh = true;
+    else if (c === skeier) { ry.push(veld); veld = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && teks[i + 1] === '\n') i++; ry.push(veld); rye.push(ry); ry = []; veld = ''; }
+    else veld += c;
+  }
+  if (veld || ry.length) { ry.push(veld); rye.push(ry); }
+  return [{ naam: 'CSV', rye }];
+}
+
+/** Skryf 'n .xlsx met een blad per tabel. blaaie: [{ naam, kolomme:[{t, w, getal}], rye:[[…]] }] */
+function maakXlsx(blaaie) {
+  const x = v => String(v ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const gebruik = new Set();
+  const name = blaaie.map(b => { let n = String(b.naam).replace(/[\[\]:*?\/\\]/g, ' ').slice(0, 31) || 'Blad'; let m = n, i = 2; while (gebruik.has(m.toLowerCase())) m = n.slice(0, 28) + ' ' + i++; gebruik.add(m.toLowerCase()); return m; });
+  const lêers = [];
+  lêers.push({ naam: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${blaaie.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>` });
+  lêers.push({ naam: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' });
+  lêers.push({ naam: 'xl/workbook.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook ${ns}><sheets>${name.map((n, i) => `<sheet name="${x(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>` });
+  lêers.push({ naam: 'xl/_rels/workbook.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${blaaie.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${blaaie.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` });
+  lêers.push({ naam: 'xl/styles.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F4C4A"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>` });
+  blaaie.forEach((b, i) => {
+    const sel = (v, k, r, kop) => {
+      const ref = kolLetter(k) + r;
+      if (!kop && typeof v === 'number' && isFinite(v)) return `<c r="${ref}"><v>${v}</v></c>`;
+      if (v === '' || v === null || v === undefined) return '';
+      return `<c r="${ref}" t="inlineStr"${kop ? ' s="1"' : ''}><is><t xml:space="preserve">${x(v)}</t></is></c>`;
+    };
+    const rye = [`<row r="1">${b.kolomme.map((k, j) => sel(k.t, j, 1, true)).join('')}</row>`]
+      .concat(b.rye.map((ry, r) => `<row r="${r + 2}">${ry.map((v, j) => sel(v, j, r + 2, false)).join('')}</row>`));
+    const laaste = kolLetter(b.kolomme.length - 1) + (b.rye.length + 1);
+    lêers.push({ naam: `xl/worksheets/sheet${i + 1}.xml`, data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet ${ns}><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${b.kolomme.map((k, j) => `<col min="${j + 1}" max="${j + 1}" width="${k.xl || Math.max(8, Math.min(60, (k.w || 10) * 1.1))}" customWidth="1"/>`).join('')}</cols><sheetData>${rye.join('')}</sheetData><autoFilter ref="A1:${laaste}"/></worksheet>` });
+  });
+  return maakZip(lêers);
+}
+
+/* ---------------------------------------------------------------------
+   VOER IN UIT EXCEL
+--------------------------------------------------------------------- */
+const INVOER_VELDE = [
+  ['barcode', 'Strepieskode / SKU', /sku|barcode|strepie|kode|code/i],
+  ['naam', 'Itemnaam', /item ?name|naam|name|item|beskrywing|description/i],
+  ['ligging', 'Lab / lokaal', /^lab\.?$|lab |lokaal|ligging|location|klas|room|kamer/i],
+  ['hoeveelheid', 'Hoeveelheid', /inventory|hoeveel|qty|quantity|aantal|voorraad|count|stock$/i],
+  ['kategorie', 'Kategorie (opsioneel)', /kategorie|category|tipe|type|groep/i],
+  ['eenheid', 'Eenheid (opsioneel)', /eenheid|unit/i]
+];
+const lykSoosLokaal = v => /^[A-Za-z]{1,4}[ -]?\d{1,3}[A-Za-z]?$/.test(String(v).trim());
+
+function raaiKolomme(kop, data) {
+  const k = {}, gebruik = new Set();
+  const kry = (veld, re, verbied) => {
+    const i = kop.findIndex((h, j) => !gebruik.has(j) && re.test(String(h)) && !(verbied && verbied(j)));
+    if (i >= 0) { k[veld] = i; gebruik.add(i); }
+  };
+  const lokaalAgtig = j => { const w = data.map(r => r[j]).filter(v => v !== '' && v !== undefined).slice(0, 30); return w.length && w.filter(lykSoosLokaal).length / w.length > .8; };
+  const getalAgtig = j => { const w = data.map(r => r[j]).filter(v => v !== '' && v !== undefined).slice(0, 30); return !w.length || w.every(v => !isNaN(getal(v))); };
+  kry('barcode', INVOER_VELDE[0][2]);
+  kry('hoeveelheid', INVOER_VELDE[3][2], j => !getalAgtig(j));
+  kry('naam', INVOER_VELDE[1][2]);
+  kry('ligging', INVOER_VELDE[2][2]);
+  if (k.ligging === undefined) { const i = kop.findIndex((_, j) => !gebruik.has(j) && lokaalAgtig(j)); if (i >= 0) { k.ligging = i; gebruik.add(i); } }
+  kry('kategorie', INVOER_VELDE[4][2]);
+  kry('eenheid', INVOER_VELDE[5][2], lokaalAgtig);
+  return k;
+}
+
+function wysInvoer() {
+  const ink = { blaaie: null, blad: 0, kopRy: 0, kol: {}, modus: 'stel', skep: true, stdLig: werkLigging(), lêer: '' };
+  maakBlad('Voer voorraad in uit Excel', '', blad => {
+    const teken = () => {
+      const b = ink.blaaie?.[ink.blad];
+      const kop = b ? (b.rye[ink.kopRy] || []) : [];
+      const data = b ? b.rye.slice(ink.kopRy + 1).filter(r => r.some(v => String(v).trim() !== '')) : [];
+      const rye = data.map((r, i) => {
+        const w = {}; INVOER_VELDE.forEach(([v]) => { if (ink.kol[v] !== undefined && ink.kol[v] !== '') w[v] = String(r[ink.kol[v]] ?? '').trim(); });
+        w.ry = ink.kopRy + i + 2; return w;
+      }).filter(w => w.naam || (w.barcode && w.barcode !== '0'));
+      ink.rye = rye;
+      const ligPerNaam = new Map(S.liggings.filter(l => l.aktief).map(l => [l.naam.trim().toLowerCase(), l]));
+      const lokale = [...new Set(rye.map(r => r.ligging).filter(Boolean))];
+      const nuweLokale = lokale.filter(l => !ligPerNaam.has(l.toLowerCase()));
+      const nuweItems = rye.filter(r => !r.barcode || !IX.item.has(r.barcode)).length;
+      const negatief = rye.filter(r => getal(r.hoeveelheid) < 0).length;
+      const sonderNaam = rye.filter(r => (!r.barcode || !IX.item.has(r.barcode)) && !r.naam).length;
+      const kolKeuse = (veld, titel) => `<label class="veld"><span>${titel}</span><select class="inv" data-kol="${veld}"><option value="">— nie in lêer nie —</option>${kop.map((h, j) => `<option value="${j}" ${ink.kol[veld] === j ? 'selected' : ''}>${esc(kolLetter(j))}: ${esc(String(h).split('\n')[0] || '(leeg)')}</option>`).join('')}</select></label>`;
+      blad.lyf.innerHTML = `
+        <label class="kn vol" style="margin-bottom:12px">${IK.dok}<span>${ink.lêer ? esc(ink.lêer) + ' — kies ander' : 'Kies Excel- of CSV-lêer'}</span><input type="file" id="ilêer" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+        ${!b ? `<div class="kaart plat sag klein">Die lêer moet 'n ry met opskrifte hê, bv. <b>Stock keeping unit (SKU) · Item name · Lab · Inventory</b>. Kolomme word outomaties herken; jy kan dit hieronder verander.<br><br>Ou <b>.xls</b>-lêers: maak oop in Excel en stoor eers as <b>.xlsx</b>.</div>` : `
+        <div class="kaart stapel">
+          ${ink.blaaie.length > 1 ? `<label class="veld"><span>Blad</span><select class="inv" id="iblad">${ink.blaaie.map((x, i) => `<option value="${i}" ${i === ink.blad ? 'selected' : ''}>${esc(x.naam)} (${x.rye.length} rye)</option>`).join('')}</select></label>` : ''}
+          <label class="veld"><span>Opskrifte is in ry</span><input class="inv" id="ikop" type="number" min="1" value="${ink.kopRy + 1}"></label>
+          ${INVOER_VELDE.map(([v, t]) => kolKeuse(v, t)).join('')}
+          ${ink.kol.ligging === undefined || ink.kol.ligging === '' ? `<label class="veld"><span>Alles gaan na</span>${ligKeuse('istd', ink.stdLig)}</label>` : ''}
+        </div>
+        <div class="kaart stapel">
+          <label class="skakel"><input type="radio" name="imod" value="stel" ${ink.modus === 'stel' ? 'checked' : ''} style="accent-color:var(--hoof)"><span><b>Vervang</b> die voorraad met hierdie getalle <span class="sag klein">(soos 'n telling — veilig om weer te doen)</span></span></label>
+          <label class="skakel"><input type="radio" name="imod" value="byvoeg" ${ink.modus === 'byvoeg' ? 'checked' : ''} style="accent-color:var(--hoof)"><span><b>Tel by</b> wat reeds in voorraad is <span class="sag klein">(bv. 'n nuwe aflewering)</span></span></label>
+          ${isAdmin() && nuweLokale.length ? `<label class="skakel"><input type="checkbox" id="iskep" ${ink.skep ? 'checked' : ''}><span>Skep nuwe liggings: <b>${nuweLokale.map(esc).join(', ')}</b></span></label>` : ''}
+        </div>
+        <div class="kaart">
+          <div class="ry tussen"><b>Opsomming</b><span class="etiket">${rye.length} rye</span></div>
+          <ul class="voorraadlys">
+            <li><span>Nuwe items</span><b>${nuweItems}</b></li>
+            <li><span>Bestaande items (word opgedateer)</span><b>${rye.length - nuweItems}</b></li>
+            ${lokale.length ? `<li><span>Liggings</span><span>${lokale.map(l => `${esc(l)}${ligPerNaam.has(l.toLowerCase()) ? '' : ' <span class="etiket amber">nuut</span>'}`).join(', ')}</span></li>` : ''}
+            ${negatief ? `<li><span class="etiket amber">Let wel</span><span>${negatief} ry(e) het 'n negatiewe hoeveelheid — word as 0 ingevoer</span></li>` : ''}
+            ${sonderNaam ? `<li><span class="etiket rooi">Probleem</span><span>${sonderNaam} nuwe ry(e) sonder naam — word oorgeslaan</span></li>` : ''}
+            ${!isAdmin() && nuweLokale.length ? `<li><span class="etiket rooi">Probleem</span><span>Onbekende liggings (${nuweLokale.map(esc).join(', ')}) — net die admin kan dit skep</span></li>` : ''}
+          </ul>
+          <div style="overflow-x:auto;margin-top:10px"><table class="klein" style="border-collapse:collapse;width:100%">
+            <tr>${['Kode', 'Naam', 'Lab', 'Hv'].map(h => `<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--lyn)">${h}</th>`).join('')}</tr>
+            ${rye.slice(0, 6).map(r => `<tr><td class="mono" style="padding:4px 6px">${esc(r.barcode || '(nuut)')}</td><td style="padding:4px 6px">${esc(r.naam || IX.item.get(r.barcode)?.naam || '')}</td><td style="padding:4px 6px">${esc(r.ligging || ligNaam(ink.stdLig))}</td><td style="padding:4px 6px;text-align:right">${esc(r.hoeveelheid ?? '')}</td></tr>`).join('')}
+          </table>${rye.length > 6 ? `<p class="sag klein" style="margin:6px">… en nog ${rye.length - 6}</p>` : ''}</div>
+        </div>
+        <button class="kn hoof vol" id="idoen" ${rye.length ? '' : 'disabled'}>Voer ${rye.length} rye in</button>`}`;
+      $('#ilêer', blad.lyf).onchange = async e => {
+        const f = e.target.files[0]; if (!f) return;
+        try {
+          const buf = await f.arrayBuffer();
+          ink.blaaie = /\.csv$/i.test(f.name) || f.type === 'text/csv' ? leesCsv(new TextDecoder().decode(buf)) : await leesXlsx(buf);
+          if (!ink.blaaie.length) throw new Error('Geen blaaie in die lêer nie.');
+          ink.lêer = f.name;
+          // Kies die blad wat die meeste na 'n voorraadlys lyk
+          const telling = ink.blaaie.map(x => {
+            const ki = x.rye.findIndex(r => r.filter(v => String(v).trim()).length >= 2);
+            const kop = x.rye[ki] || [];
+            const k = raaiKolomme(kop, x.rye.slice(ki + 1, ki + 31));
+            const regte = x.rye.slice(ki + 1).filter(r => k.naam !== undefined && String(r[k.naam] ?? '').trim()).length;
+            return ['barcode', 'naam', 'hoeveelheid', 'ligging'].filter(v => k[v] !== undefined).length * 1000
+              + (/inventory|voorraad|current|stock|inventaris/i.test(x.naam) ? 3000 : 0)
+              - (kop.some(h => /date|datum|timestamp|tyd/i.test(String(h))) ? 3000 : 0) + Math.min(regte, 999);
+          });
+          ink.blad = telling.indexOf(Math.max(...telling));
+          stelBlad();
+        } catch (err) { wysFout(blad.lyf, err); }
+      };
+      if (!b) return;
+      if ($('#iblad', blad.lyf)) $('#iblad', blad.lyf).onchange = e => { ink.blad = +e.target.value; stelBlad(); };
+      $('#ikop', blad.lyf).onchange = e => { ink.kopRy = Math.max(0, (+e.target.value || 1) - 1); ink.kol = raaiKolomme(ink.blaaie[ink.blad].rye[ink.kopRy] || [], ink.blaaie[ink.blad].rye.slice(ink.kopRy + 1)); teken(); };
+      $$('[data-kol]', blad.lyf).forEach(sel => sel.onchange = () => { ink.kol[sel.dataset.kol] = sel.value === '' ? '' : +sel.value; teken(); });
+      if ($('select[name=istd]', blad.lyf)) $('select[name=istd]', blad.lyf).onchange = e => { ink.stdLig = e.target.value; teken(); };
+      $$('input[name=imod]', blad.lyf).forEach(r => r.onchange = () => { ink.modus = r.value; });
+      if ($('#iskep', blad.lyf)) $('#iskep', blad.lyf).onchange = e => { ink.skep = e.target.checked; };
+      $('#idoen', blad.lyf).onclick = () => voerIn(ink, blad, $('#idoen', blad.lyf));
+    };
+    const stelBlad = () => {
+      const r = ink.blaaie[ink.blad].rye;
+      ink.kopRy = Math.max(0, r.findIndex(x => x.filter(v => String(v).trim()).length >= 2));
+      ink.kol = raaiKolomme(r[ink.kopRy] || [], r.slice(ink.kopRy + 1));
+      teken();
+    };
+    teken();
+  });
+}
+
+async function voerIn(ink, blad, kn) {
+  if (ink.kol.barcode === undefined && ink.kol.naam === undefined) return wysFout(blad.lyf, new Error('Kies ten minste die kolom vir die strepieskode of die naam.'));
+  const totaal = { nuweItems: 0, nuweKodes: [], bestaandeItems: 0, voorraadRye: 0, nuweLiggings: [], foute: [], waarskuwings: [] };
+  const stuk = 400;
+  await metKnop(kn, async () => {
+    try {
+      for (let i = 0; i < ink.rye.length; i += stuk) {
+        kn.innerHTML = `Besig… ${Math.min(i + stuk, ink.rye.length)} van ${ink.rye.length}`;
+        const r = await api('invoer', { rye: ink.rye.slice(i, i + stuk), modus: ink.modus, skepLiggings: ink.skep, standaardLigging: ink.kol.ligging === undefined || ink.kol.ligging === '' ? ink.stdLig : '' });
+        ['nuweItems', 'bestaandeItems', 'voorraadRye'].forEach(k => totaal[k] += r[k]);
+        ['nuweKodes', 'nuweLiggings', 'foute', 'waarskuwings'].forEach(k => totaal[k].push(...r[k]));
+      }
+    } catch (e) { wysFout(blad.lyf, e); return; }
+    blad.sluit();
+    await laaiAlles(true);
+    wysInvoerUitslag(totaal);
+  });
+}
+function wysInvoerUitslag(t) {
+  maakBlad('Invoer voltooi', `
+    <div class="kaart"><ul class="voorraadlys" style="border-top:0;margin:0">
+      <li><span>Nuwe items</span><b>${t.nuweItems}</b></li>
+      <li><span>Bestaande items opgedateer</span><b>${t.bestaandeItems}</b></li>
+      <li><span>Voorraadrye gestoor</span><b>${t.voorraadRye}</b></li>
+      ${t.nuweLiggings.length ? `<li><span>Nuwe liggings</span><b>${t.nuweLiggings.map(esc).join(', ')}</b></li>` : ''}
+    </ul></div>
+    ${t.waarskuwings.length ? `<div class="afdeling">Waarskuwings (${t.waarskuwings.length})</div><div class="lys">${t.waarskuwings.map(w => `<div class="el" style="cursor:default"><div class="hoof-teks"><b>${esc(w.naam || w.kode)}</b><span class="sag klein">Ry ${w.ry} · ${esc(w.boodskap)}</span></div></div>`).join('')}</div>` : ''}
+    ${t.foute.length ? `<div class="afdeling">Nie ingevoer nie (${t.foute.length})</div><div class="lys">${t.foute.map(f => `<div class="el" style="cursor:default"><div class="hoof-teks"><b>${esc(f.naam || f.kode || '')}</b><span class="sag klein">Ry ${f.ry} · ${esc(f.fout)}</span></div></div>`).join('')}</div>` : ''}
+    ${t.nuweKodes.length ? `<button class="kn amber vol" id="ietk" style="margin-top:14px">${IK.etiket}<span>Maak etikette vir die ${t.nuweKodes.length} nuwe items</span></button>` : ''}
+    <button class="kn vol" id="itoe" style="margin-top:10px">Klaar</button>`, b => {
+    $('#itoe', b.lyf).onclick = () => b.sluit();
+    if ($('#ietk', b.lyf)) $('#ietk', b.lyf).onclick = () => { t.nuweKodes.forEach(k => voegEtiketBy(k, 1)); sluitAlleBlaaie(); S.blad = 'etikette'; teken(); };
+  });
+}
+
+/* ---------------------------------------------------------------------
+   VERSLAE — PDF of Excel
+--------------------------------------------------------------------- */
+const VERSLAE = [
+  ['voorraad', 'Voorraad per lokaal', false],
+  ['uitleen', 'Uitlenings (terug of nie)', true],
+  ['gebreek', 'Gebreekte voorraad', true],
+  ['in', 'Ingeteken (in)', true],
+  ['uit', 'Uitgeteken (uit)', true],
+  ['versoeke', 'Versoeke', true]
+];
+
+function bouVerslag(soort, f, log) {
+  const binne = iso => { if (!iso) return false; const d = new Date(iso); return d >= f.vanD && d <= f.totD; };
+  const ligOk = id => magLig(id) && (!f.lig || id === f.lig);
+  const it = bc => IX.item.get(bc) || { naam: bc, eenheid: '', kategorie: '' };
+  if (soort === 'voorraad') {
+    const rye = S.voorraad.filter(v => ligOk(v.liggingId) && IX.lig.get(v.liggingId)?.aktief && it(v.barcode).aktief !== false && (f.nulle || v.hoeveelheid !== 0))
+      .map(v => {
+        const geleen = oopLenings(v.barcode).filter(l => l.vanLigging === v.liggingId).reduce((a, l) => a + uitstaande(l), 0);
+        return [ligNaam(v.liggingId), v.barcode, it(v.barcode).naam, it(v.barcode).kategorie || '', v.hoeveelheid, it(v.barcode).eenheid || '', geleen || '', v.hoeveelheid + geleen];
+      })
+      .sort((a, b) => a[0].localeCompare(b[0]) || a[3].localeCompare(b[3]) || a[2].localeCompare(b[2]));
+    return { titel: 'Voorraad per lokaal', datum: false, groep: 0, som: [4, 6, 7],
+      kolomme: [{ t: 'Lokaal', w: 16 }, { t: 'Kode', w: 18 }, { t: 'Item', w: 50 }, { t: 'Kategorie', w: 22 }, { t: 'In lokaal', w: 12, getal: true }, { t: 'Eenheid', w: 12 }, { t: 'Uitgeleen', w: 12, getal: true }, { t: 'Totaal', w: 12, getal: true }], rye };
+  }
+  if (soort === 'uitleen') {
+    const rye = S.uitlenings.filter(l => (ligOk(l.vanLigging) || ligOk(l.naLigging)) && binne(l.uitDatum))
+      .sort((a, b) => (b.uitDatum || '').localeCompare(a.uitDatum || ''))
+      .map(l => [fmtDT(l.uitDatum), l.barcode, it(l.barcode).naam, l.hoeveelheid, ligNaam(l.vanLigging), ligNaam(l.naLigging), l.persoon,
+        fmtD(l.terugDatum), l.status === 'terug' ? 'Terug' : isLaat(l) ? 'LAAT' : 'Uitstaande', l.terugGegee || '', l.status === 'terug' ? fmtDT(l.terugOp) : '']);
+    return { titel: 'Uitlenings', datum: true,
+      kolomme: [{ t: 'Uit op', w: 22 }, { t: 'Kode', w: 17 }, { t: 'Item', w: 38 }, { t: 'Hv', w: 8, getal: true }, { t: 'Van', w: 16 }, { t: 'Na', w: 16 }, { t: 'Persoon', w: 26 }, { t: 'Terug teen', w: 16 }, { t: 'Status', w: 15 }, { t: 'Terug', w: 9, getal: true }, { t: 'Terug op', w: 22 }], rye };
+  }
+  if (soort === 'gebreek') {
+    const rye = S.gebreek.filter(g => ligOk(g.liggingId) && binne(g.datum)).sort((a, b) => (b.datum || '').localeCompare(a.datum || ''))
+      .map(g => [fmtDT(g.datum), g.barcode, it(g.barcode).naam, ligNaam(g.liggingId), g.hoeveelheid, g.rede || '', g.deur, { aangemeld: 'Aangemeld', herstel: 'Herstel', afgeskryf: 'Afgeskryf' }[g.status] || g.status, g.opgelosOp ? fmtD(g.opgelosOp) : '']);
+    return { titel: 'Gebreekte voorraad', datum: true, som: [4],
+      kolomme: [{ t: 'Datum', w: 22 }, { t: 'Kode', w: 17 }, { t: 'Item', w: 40 }, { t: 'Lokaal', w: 16 }, { t: 'Hv', w: 8, getal: true }, { t: 'Rede', w: 45 }, { t: 'Gemeld deur', w: 22 }, { t: 'Status', w: 15 }, { t: 'Hanteer op', w: 16 }], rye };
+  }
+  if (soort === 'in' || soort === 'uit') {
+    const aksie = soort === 'in' ? 'IN' : 'UIT';
+    const rye = log.filter(l => l.aksie === aksie && ligOk(l.liggingId)).sort((a, b) => (b.tyd || '').localeCompare(a.tyd || ''))
+      .map(l => [fmtDT(l.tyd), l.barcode, it(l.barcode).naam, ligNaam(l.liggingId), l.hoeveelheid, it(l.barcode).eenheid || '', l.gebruiker, l.nota || '']);
+    return { titel: soort === 'in' ? 'Ingeteken' : 'Uitgeteken', datum: true, som: [4],
+      kolomme: [{ t: 'Datum', w: 22 }, { t: 'Kode', w: 17 }, { t: 'Item', w: 50 }, { t: 'Lokaal', w: 16 }, { t: 'Hv', w: 9, getal: true }, { t: 'Eenheid', w: 12 }, { t: 'Deur', w: 24 }, { t: 'Nota', w: 40 }], rye };
+  }
+  if (soort === 'versoeke') {
+    const rye = S.versoeke.filter(v => (ligOk(v.vanLigging) || ligOk(v.naLigging) || (!f.lig && v.versoekerId === S.gebruiker.id)) && binne(v.geskep))
+      .sort((a, b) => (b.geskep || '').localeCompare(a.geskep || ''))
+      .map(v => [fmtDT(v.geskep), v.barcode, it(v.barcode).naam, v.hoeveelheid, ligNaam(v.vanLigging), ligNaam(v.naLigging), v.versoeker, (VS_STATUS[v.status] || [v.status])[0], v.antwoordDeur || '', v.antwoordNota || v.nota || '']);
+    return { titel: 'Versoeke', datum: true,
+      kolomme: [{ t: 'Gestuur', w: 22 }, { t: 'Kode', w: 17 }, { t: 'Item', w: 36 }, { t: 'Hv', w: 8, getal: true }, { t: 'Van', w: 16 }, { t: 'Na', w: 16 }, { t: 'Versoeker', w: 24 }, { t: 'Status', w: 16 }, { t: 'Antwoord deur', w: 22 }, { t: 'Nota', w: 36 }], rye };
+  }
+}
+
+function verslagPdf(verslae, f) {
+  const pdf = new KleinPdf(297, 210);
+  const M = 12, B = 297 - 2 * M, RH = 5.4;
+  const skool = S.instellings.skool || 'Lab Voorraad';
+  const filterTeks = (v) => [f.lig ? 'Lokaal: ' + ligNaam(f.lig) : (isAdmin() ? 'Alle lokale' : 'My lokale'), v.datum ? `Tydperk: ${fmtD(f.vanD.toISOString())} – ${fmtD(f.totD.toISOString())}` : `Stand op ${fmtDT(new Date().toISOString())}`].join('   ·   ');
+  let eerste = true;
+  verslae.forEach(v => {
+    if (!eerste) pdf.nuweBlad();
+    eerste = false;
+    const kol = v.kolomme.map((k, i) => ({ ...k, i })).filter(k => k.i !== v.groep);
+    const som = kol.reduce((a, k) => a + k.w, 0);
+    let x = M; kol.forEach(k => { k.x = x; k.b = k.w / som * B; x += k.b; });
+    let y;
+    const kop = () => {
+      pdf.teks(v.titel, M, M + 5, 15, { vet: true });
+      pdf.teks(skool, 297 - M, M + 5, 9, { belyn: 'regs', grys: .35 });
+      pdf.teks(filterTeks(v), M, M + 11, 8.5, { grys: .35 });
+      y = M + 16;
+      pdf.vul(M, y, B, RH + .6, [.06, .3, .29]);
+      kol.forEach(k => pdf.teks(pdf.pas(k.t, k.b - 2, 8, true), k.getal ? k.x + k.b - 1 : k.x + 1, y + 4, 8, { vet: true, belyn: k.getal ? 'regs' : 'links', grys: 1 }));
+      y += RH + .6;
+    };
+    let groep = null, zebra = 0;
+    const plek = (h) => {
+      if (y + h <= 210 - M - 6) return;
+      pdf.nuweBlad(); kop();
+      if (v.groep !== undefined && groep !== null) { pdf.teks(`${groep} (vervolg)`, M + 1, y + 4.2, 9, { vet: true, grys: .3 }); y += RH + .5; }
+    };
+    kop();
+    if (!v.rye.length) { pdf.teks('Niks in hierdie tydperk of lokaal nie.', M + 1, y + 6, 9, { grys: .4 }); return; }
+    const somRy = (rye, etiket) => {
+      if (!v.som) return;
+      plek(RH);
+      pdf.streep(M, y + .2, M + B, y + .2, .5, .3);
+      pdf.teks(etiket, kol[0].x + 1, y + 4, 8, { vet: true });
+      v.som.forEach(si => { const k = kol.find(c => c.i === si); if (!k) return; const t = rye.reduce((a, r) => a + (Number(r[si]) || 0), 0); pdf.teks(fmtN(t), k.x + k.b - 1, y + 4, 8, { vet: true, belyn: 'regs' }); });
+      y += RH + 1.5;
+    };
+    let groepRye = [];
+    v.rye.forEach((r, ri) => {
+      if (v.groep !== undefined && r[v.groep] !== groep) {
+        if (groep !== null) somRy(groepRye, 'Subtotaal');
+        groep = r[v.groep]; groepRye = []; zebra = 0;
+        plek(RH * 3);
+        y += 1.5;
+        pdf.teks(String(groep), M + 1, y + 4.2, 10.5, { vet: true });
+        const n = v.rye.filter(x => x[v.groep] === groep).length;
+        pdf.teks(`${n} item${n === 1 ? '' : 's'}`, M + B - 1, y + 4.2, 8, { belyn: 'regs', grys: .4 });
+        y += RH + 1;
+        pdf.streep(M, y, M + B, y, .06, .4);
+      }
+      plek(RH);
+      if (zebra++ % 2) pdf.vul(M, y, B, RH, [.95, .96, .955]);
+      kol.forEach(k => {
+        const w = r[k.i];
+        const t = typeof w === 'number' ? fmtN(w) : String(w ?? '');
+        pdf.teks(pdf.pas(t, k.b - 2, 8), k.getal ? k.x + k.b - 1 : k.x + 1, y + 3.8, 8, { belyn: k.getal ? 'regs' : 'links', vet: t === 'LAAT' });
+      });
+      groepRye.push(r);
+      y += RH;
+    });
+    if (v.groep !== undefined) somRy(groepRye, 'Subtotaal');
+    if (v.som) { y += 1; somRy(v.rye, `Totaal (${v.rye.length} rye)`); }
+    else { plek(RH); pdf.teks(`${v.rye.length} rye`, M + 1, y + 5, 8, { grys: .4 }); }
+  });
+  // Voetskrif met bladsynommers
+  const n = pdf.blaaie.length;
+  pdf.blaaie.forEach((ops, i) => {
+    pdf.ops = ops;
+    pdf.streep(M, 210 - M + 1, 297 - M, 210 - M + 1, .8, .2);
+    pdf.teks(`Gegenereer ${fmtDT(new Date().toISOString())} deur ${S.gebruiker.naam}`, M, 210 - M + 5, 7.5, { grys: .45 });
+    pdf.teks(`Bladsy ${i + 1} van ${n}`, 297 - M, 210 - M + 5, 7.5, { belyn: 'regs', grys: .45 });
+  });
+  return pdf.bou();
+}
+
+function verslagXlsx(verslae, f) {
+  return maakXlsx(verslae.map(v => ({
+    naam: v.titel,
+    kolomme: v.kolomme.map(k => ({ ...k, xl: k.w * 0.9 })),
+    rye: v.rye
+  })));
+}
+
+function wysVerslae() {
+  const nou = new Date();
+  const st = stoor.kry('dva_verslag', {});
+  const f = { soorte: st.soorte || ['voorraad'], lig: '', van: isoDag(new Date(nou.getFullYear(), 0, 1)), tot: isoDag(nou), nulle: !!st.nulle };
+  const kort = {
+    'Hierdie maand': () => [new Date(nou.getFullYear(), nou.getMonth(), 1), nou],
+    'Vorige maand': () => [new Date(nou.getFullYear(), nou.getMonth() - 1, 1), new Date(nou.getFullYear(), nou.getMonth(), 0)],
+    'Hierdie jaar': () => [new Date(nou.getFullYear(), 0, 1), nou],
+    'Alles': () => [new Date(2000, 0, 1), nou]
+  };
+  maakBlad('Verslae', `<form class="stapel" id="vf">
+    <div class="kaart stapel" style="margin:0"><b>Watter verslae?</b>
+      ${VERSLAE.map(([k, n]) => `<label class="skakel"><input type="checkbox" name="soort" value="${k}" ${f.soorte.includes(k) ? 'checked' : ''}><span>${n}</span></label>`).join('')}
+      <label class="skakel klein sag" style="margin-left:54px"><input type="checkbox" name="nulle" ${f.nulle ? 'checked' : ''}><span>Wys ook items met 0 in voorraad</span></label></div>
+    <label class="veld"><span>Lokaal</span>${ligKeuse('lig', '', myLiggings(), isAdmin() ? 'Alle lokale' : 'Al my lokale')}</label>
+    <div><div class="skyfies" style="margin-bottom:8px">${Object.keys(kort).map(k => `<button type="button" class="skyf" data-k="${k}">${k}</button>`).join('')}</div>
+    <div class="twee"><label class="veld"><span>Van</span><input class="inv" type="date" name="van" value="${f.van}"></label>
+      <label class="veld"><span>Tot</span><input class="inv" type="date" name="tot" value="${f.tot}"></label></div>
+    <p class="sag klein" style="margin:6px 2px 0">Die tydperk geld vir alles behalwe <i>Voorraad per lokaal</i>, wat die huidige stand wys.</p></div>
+    <div class="twee"><button type="button" class="kn hoof" data-fmt="pdf">${IK.dok}<span>PDF</span></button>
+      <button type="button" class="kn amber" data-fmt="xlsx">${IK.dok}<span>Excel</span></button></div>
+  </form>`, blad => {
+    const vorm = $('#vf', blad.lyf);
+    $$('[data-k]', vorm).forEach(b => b.onclick = () => { const [a, z] = kort[b.dataset.k](); vorm.van.value = isoDag(a); vorm.tot.value = isoDag(z); });
+    $$('[data-fmt]', vorm).forEach(b => b.onclick = () => metKnop(b, async () => {
+      const soorte = $$('input[name=soort]:checked', vorm).map(i => i.value);
+      if (!soorte.length) return wysFout(vorm, new Error('Kies ten minste een verslag.'));
+      stoor.stel('dva_verslag', { soorte, nulle: vorm.nulle.checked });
+      const vanD = new Date(vorm.van.value || '2000-01-01'); vanD.setHours(0, 0, 0, 0);
+      const totD = new Date(vorm.tot.value || isoDag(nou)); totD.setHours(23, 59, 59, 999);
+      if (totD < vanD) return wysFout(vorm, new Error('Die "tot"-datum is voor die "van"-datum.'));
+      const filt = { lig: vorm.lig.value, vanD, totD, nulle: vorm.nulle.checked };
+      try {
+        let log = [];
+        const aksies = soorte.filter(s => s === 'in' || s === 'uit').map(s => s.toUpperCase());
+        if (aksies.length) log = (await api('verslag_data', { van: isoDag(vanD), tot: isoDag(totD), aksies })).log;
+        const verslae = soorte.map(s => bouVerslag(s, filt, log));
+        const stempel = isoDag(nou);
+        const naamDeel = soorte.length === 1 ? VERSLAE.find(x => x[0] === soorte[0])[1].split(' (')[0].toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'verslae';
+        if (b.dataset.fmt === 'pdf') {
+          laaiAf(new Blob([verslagPdf(verslae, filt)], { type: 'application/pdf' }), `${naamDeel}-${stempel}.pdf`, { titel: 'Verslag is gereed', teks: `${verslae.map(v => `<b>${esc(v.titel)}</b>: ${v.rye.length} rye`).join('<br>')}` });
+        } else {
+          const blob = verslagXlsx(verslae, filt);
+          laaiAf(new Blob([blob], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${naamDeel}-${stempel}.xlsx`, { titel: 'Excel-verslag is gereed', teks: `${verslae.length} blad${verslae.length === 1 ? '' : 'e'}: ${verslae.map(v => `<b>${esc(v.titel)}</b> (${v.rye.length})`).join(', ')}` });
+        }
+      } catch (e) { wysFout(vorm, e); }
+    }));
   });
 }
 
@@ -1379,6 +2053,8 @@ function tekenMeer() {
   const teëls = [
     ['gebreek', IK.gebreek, 'Gebreek', oopBreek ? `${oopBreek} wag vir hantering` : 'Niks oop nie'],
     ['geskiedenis', IK.klok, 'Geskiedenis', 'Alle bewegings'],
+    ['verslae', IK.dok, 'Verslae', 'PDF of Excel'],
+    ['invoer', IK.voorraad, 'Voer in', 'Uit Excel of CSV'],
     ...(isAdmin() ? [
       ['liggings', IK.plek, 'Liggings', `${aktieweLiggings().length} labs en klasse`],
       ['gebruikers', IK.mense, 'Gebruikers', `${S.gebruikers.filter(g => g.aktief).length} aktief`],
@@ -1391,7 +2067,7 @@ function tekenMeer() {
   $('#inhoud').innerHTML = `<div class="teëls">${teëls.map(([k, ik, t, s]) => `<button class="teël" data-t="${k}">${ik}<b>${esc(t)}</b><small>${esc(s)}</small></button>`).join('')}</div>
     <p class="sag klein" style="text-align:center;margin-top:24px">Data word in die Google Sheet op die admin se Drive gestoor.</p>`;
   $$('[data-t]').forEach(b => b.onclick = () => ({
-    gebreek: wysGebreek, geskiedenis: wysGeskiedenis, liggings: wysLiggings, gebruikers: wysGebruikers, instellings: wysInstellings,
+    gebreek: wysGebreek, geskiedenis: wysGeskiedenis, verslae: wysVerslae, invoer: wysInvoer, liggings: wysLiggings, gebruikers: wysGebruikers, instellings: wysInstellings,
     myliggings: () => { S.blad = 'voorraad'; teken(); },
     wagwoord: () => wysVeranderWagwoord(false), herlaai: () => laaiAlles(false),
     af: async () => { if (await bevestig('Meld af op hierdie foon?', 'Meld af')) meldAf(); }
@@ -1553,7 +2229,7 @@ function wysInstellings() {
   }
   const kas = stoor.kry(K.kas, null);
   if (kas && kas.gebruiker) {
-    Object.assign(S, kas, { gebruikers: kas.gebruikers || [] });
+    Object.assign(S, kas, { gebruikers: kas.gebruikers || [], versoeke: kas.versoeke || [] });
     herIndekseer();
     if (!S.gebruiker.moetVerander) teken();
   } else {
